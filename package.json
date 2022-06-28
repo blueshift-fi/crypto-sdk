@@ -1,0 +1,19 @@
+{
+  "name": "crypto-sdk",
+  "version": "0.4.0",
+  "private": false,
+  "description": "SDK for working with different blockchains",
+  "license": "GPLv3",
+  "workspaces": [
+    "packages/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blueshift-fi/crypto-sdk.git"
+  },
+  "homepage": "https://github.com/blueshift-fi/crypto-sdk#readme",
+  "dependencies": {
+    "@emurgo/cardano-serialization-lib-browser": "^9.1.4",
+    "buffer": "^6.0.3"
+  }
+}
