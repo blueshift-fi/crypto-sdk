@@ -6,12 +6,12 @@ Supported wallets:
 
 * Nami
 * Flint
-* CWallet
-* Typhon
-* Eternl
+* CardWallet
 
 Experimental wallets (may be bugs):
 
+* Eternl
+* Typhon
 * Yoroi
 
 Unsupported wallets:

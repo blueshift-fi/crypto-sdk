@@ -21,12 +21,12 @@ import { CardanoWalletName } from "./config";
 const SUPPORTED_WALLETS = [
     CardanoWalletName.NAMI,
     CardanoWalletName.FLINT,
-    CardanoWalletName.CARDWALLET,
-    CardanoWalletName.TYPHON,
-    CardanoWalletName.ETERNL
+    CardanoWalletName.CARDWALLET
 ]
 
 const EXPERIMENTAL_WALLETS = [
+    CardanoWalletName.ETERNL,
+    CardanoWalletName.TYPHON,
     CardanoWalletName.YOROI
 ]
 
