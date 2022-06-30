@@ -7,6 +7,7 @@ import BlockchainProvider from "../../blockchain/BlockchainProvider";
 import BridgeProvider from "../../bridge/BridgeProvider";
 import BridgeSupport from "../interfaces/BridgeSupport";
 
+import { Asset } from "../../common/types";
 import { CardanoAsset } from "./types";
 
 import { Buffer } from "buffer";
@@ -402,15 +403,16 @@ class CardanoWallet implements Wallet, BridgeSupport {
         const outputs = Loader.CSL.TransactionOutputs.new();
 
         for (let recipient of recipients) {
-            let lovelace = recipient.amount ? recipient.amount : "0";
+            let lovelace = recipient.amount ? recipient.amount : "1000000";
             let outputValue = Loader.CSL.Value.new(Loader.CSL.BigNum.from_str(lovelace));
 
             if (((recipient.assets || []).length > 0)) {
+                // console.log(recipient.assets);
                 let multiAsset = CardanoWallet._makeMultiAsset(recipient.assets);
                 outputValue.set_multiasset(multiAsset);
                 let minAda = Loader.CSL.min_ada_required(
                     outputValue,
-                    Loader.CSL.BigNum.from_str(protocolParameters.coins_per_utxo_word)
+                    Loader.CSL.BigNum.from_str(protocolParameters.coins_per_utxo_word).checked_add(Loader.CSL.BigNum.from_str("1000000"))
                 );
                 if (Loader.CSL.BigNum.from_str(lovelace).compare(minAda) < 0) {
                     outputValue.set_coin(minAda);
@@ -423,8 +425,18 @@ class CardanoWallet implements Wallet, BridgeSupport {
                         Loader.CSL.Address.from_bech32(recipient.address),
                         outputValue
                     )
-                )
+                );
             }
+        }
+
+        // TODO: temporary solution
+        if (((recipients[0].assets || []).length > 0)) {
+            outputs.add(
+                Loader.CSL.TransactionOutput.new(
+                    Loader.CSL.Address.from_bech32(payer.address),
+                    Loader.CSL.Value.new(Loader.CSL.BigNum.from_str("3000000"))
+                )
+            );
         }
 
 
@@ -579,8 +591,8 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async bridge(
-        amount: string,
-        // asset: Asset = undefined,
+        // amount: string,
+        asset: Asset,
         to: {
             address: string,
             chain: ChainName
@@ -602,7 +614,11 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 networkId
                 ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].address
                 : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].address,
-            amount: amount
+            amount: asset.token == "lovelace" ? asset.quantity : undefined,
+            assets: asset.token != "lovelace" ? [{
+                unit: asset.token,
+                quantity: asset.quantity
+            }] : undefined
             // assets: {
             //     "fda1b6b487bee2e7f64ecf24d24b1224342484c0195ee1b7b943db50.tBLUES": 1000000
             // }

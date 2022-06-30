@@ -1,13 +1,14 @@
 import BridgeProvider from "../../bridge/BridgeProvider";
 import { BridgeName, ChainName } from "../../bridge/types";
+import { Asset } from "../../common/types";
 
 
 interface BridgeSupport {
     setBridgeProvider(bridgeProvider: BridgeProvider): void;
 
     bridge(
-        amount: string,
-        // asset: Asset = undefined,
+        // amount: string,
+        asset: Asset,
         to: {
             address: string,
             chain: ChainName

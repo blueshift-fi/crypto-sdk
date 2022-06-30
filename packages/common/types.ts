@@ -1,7 +1,7 @@
 
 
 export type Asset = {
-    tokenId: string,
+    token: string,
     quantity: string,
     decimals?: number
 }

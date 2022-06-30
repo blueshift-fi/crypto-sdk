@@ -41,8 +41,6 @@ interface Wallet {
 
     /* TRANSACTION HANDLING */
 
-    bridge(amount: string, to: {address: string, chain: string}, by: string, options: any): Promise<any>
-
     /* EVENT HANDLING */
 
     /**
