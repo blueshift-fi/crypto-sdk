@@ -8,6 +8,16 @@
     "moduleResolution": "node",
     "sourceMap": true,
     "lib": ["es2015", "dom"],
+    "baseUrl": ".",
+    "paths": {
+      "*": [
+        "./node_modules/*"
+      ],
+      "src/*": ["./src/*"],
+      "@common/*": ["./src/common/*"],
+      "@blockchain/*": ["./src/blockchain/*"]
+    },
+    "allowJs": true,
     "rootDir": "src"
   },
   "include": ["src"],
