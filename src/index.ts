@@ -1,2 +1,2 @@
-export * as common from './common';
-export * as blockchain from './blockchain';
+export * from './common';
+export * from './blockchain';
