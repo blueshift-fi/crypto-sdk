@@ -6,7 +6,11 @@
     "outDir": "lib",
     "module": "commonjs",
     "moduleResolution": "node",
-    "lib": ["es2015", "dom"],
+    "lib": [
+      "es2015",
+      "es2020",
+      "dom"
+    ],
     "baseUrl": ".",
     "paths": {
       "*": [
@@ -14,7 +18,8 @@
       ],
       "src/*": ["./src/*"],
       "@common/*": ["./src/common/*"],
-      "@blockchain/*": ["./src/blockchain/*"]
+      "@blockchain/*": ["./src/blockchain/*"],
+      "@bridge/*": ["./src/bridge/*"]
     },
     "allowJs": true,
     "rootDir": "src"
