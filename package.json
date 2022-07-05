@@ -1,19 +1,32 @@
 {
   "name": "crypto-sdk",
   "version": "0.4.0",
-  "private": false,
   "description": "SDK for working with different blockchains",
   "license": "GPLv3",
-  "workspaces": [
-    "packages/*"
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "custom_modules"
   ],
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/blueshift-fi/crypto-sdk.git"
   },
   "homepage": "https://github.com/blueshift-fi/crypto-sdk#readme",
+  "keywords": [
+    "cardano",
+    "milkomeda"
+  ],
   "dependencies": {
     "@emurgo/cardano-serialization-lib-browser": "^9.1.4",
     "buffer": "^6.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.1"
   }
 }

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "strictNullChecks": true,
+    "target": "es5", 
+    "outDir": "lib",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": [
+      "es2015",
+      "es2020",
+      "dom"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "*": [
+        "./node_modules/*"
+      ],
+      "src/*": ["./src/*"],
+      "@common/*": ["./src/common/*"],
+      "@blockchain/*": ["./src/blockchain/*"],
+      "@bridge/*": ["./src/bridge/*"]
+    },
+    "allowJs": true,
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "lib"]
+}

@@ -2,7 +2,6 @@ import {
   TransactionUnspentOutput,
   TransactionOutputs,
   Value,
-  BigNum
 } from '@emurgo/cardano-serialization-lib-browser/cardano_serialization_lib';
 import Loader from './Loader';
 
@@ -153,22 +152,13 @@ import Loader from './Loader';
  * total above the upper bound.
  */
 
+/**
+ * @typedef {Value[]} AmountList - List of 'Value' object
+ */
 
 /**
- * List of 'Value' object
+ * @typedef {TransactionUnspentOutput[]} UTxOList - List of UTxO
  */
-type AmountList = Value[];
-
-
-/**
- * List of UTxO
- */
-type UTxOList = TransactionUnspentOutput[];
-
-/**
- * List of Outputs
- */
- type OutputList = TransactionOutputs;
 
 /**
  * @typedef {Object} UTxOSelection - Coin Selection algorithm core object
@@ -177,51 +167,40 @@ type UTxOList = TransactionUnspentOutput[];
  * @property {UTxOList} subset - Remaining UTxO set.
  * @property {Value} amount - UTxO amount of each requested token
  */
-type UTxOSelection = {
-  selection: UTxOList,
-  remaining: UTxOList,
-  subset: UTxOList,
-  amount: Value,
-}
 
 /**
  * @typedef {Object} ImproveRange - ImproveRange
  * @property {Value} ideal - Requested amount * 2
  * @property {Value} maximum - Requested amount * 3
  */
-type ImproveRange = {
-  ideal: Value,
-  maximum: Value
-}
 
 /**
  * @typedef {Object} SelectionResult - Coin Selection algorithm return
  * @property {UTxOList} input - Accumulated UTxO set.
- * @property {OutputList} output - Requested outputs.
+ * @property {TransactionOutputs} output - Requested outputs.
  * @property {UTxOList} remaining - Remaining UTxO set.
  * @property {Value} amount - UTxO amount of each requested token
  * @property {Value} change - Accumulated change amount.
  */
-type SelectionResult = {
-  input: UTxOList,
-  output: OutputList,
-  remaining: UTxOList,
-  amount: Value,
-  change: Value,
-}
 
+/**
+ * @typedef {Object} ProtocolParameters
+ * @property {number} coinsPerUtxoWord
+ * @property {number} minFeeA
+ * @property {number} minFeeB
+ * @property {number} maxTxSize
+ */
 
-type ProtocolParameters = {
-  coinsPerUtxoWord: BigNum,
-  minFeeA: BigNum,
-  minFeeB: BigNum,
-  maxTxSize: BigNum
-}
+/**
+ * @type {ProtocolParameters}
+ */
+let protocolParameters = null;
 
-
-class CoinSelection {
-  private protocolParameters: ProtocolParameters | null = null;
-  
+/**
+ * CoinSelection Module.
+ * @module CoinSelection
+ */
+const CoinSelection = {
   /**
    * Set protocol parameters required by the algorithm
    * @param {string} coinsPerUtxoWord
@@ -229,33 +208,31 @@ class CoinSelection {
    * @param {string} minFeeB
    * @param {string} maxTxSize
    */
-  setProtocolParameters = (coinsPerUtxoWord: string, minFeeA: string, minFeeB: string, maxTxSize: string) => {
-    this.protocolParameters = {
-      coinsPerUtxoWord: Loader.CSL.BigNum.from_str(coinsPerUtxoWord),
-      minFeeA: Loader.CSL.BigNum.from_str(minFeeA),
-      minFeeB: Loader.CSL.BigNum.from_str(minFeeB),
-      maxTxSize: Loader.CSL.BigNum.from_str(maxTxSize),
+  setProtocolParameters: (coinsPerUtxoWord, minFeeA, minFeeB, maxTxSize) => {
+    protocolParameters = {
+      coinsPerUtxoWord: coinsPerUtxoWord,
+      minFeeA: minFeeA,
+      minFeeB: minFeeB,
+      maxTxSize: maxTxSize,
     };
-
-    console.log(this.protocolParameters);
-  }
-
+  },
   /**
    * Random-Improve coin selection algorithm
    * @param {UTxOList} inputs - The set of inputs available for selection.
    * @param {TransactionOutputs} outputs - The set of outputs requested for payment.
-   * @param {int} limit - A limit on the number of inputs that can be selected.
+   * @param {number} limit - A limit on the number of inputs that can be selected.
    * @return {SelectionResult} - Coin Selection algorithm return
    */
-  randomImprove = async (inputs: UTxOList, outputs: TransactionOutputs, limit: number): Promise<SelectionResult> => {
-    if (!this.protocolParameters)
+  randomImprove: async (inputs, outputs, limit) => {
+    if (!protocolParameters)
       throw new Error(
         'Protocol parameters not set. Use setProtocolParameters().'
       );
 
     await Loader.load();
 
-    let utxoSelection: UTxOSelection = {
+    /** @type {UTxOSelection} */
+    let utxoSelection = {
       selection: [],
       remaining: [...inputs], // Shallow copy
       subset: [],
@@ -271,7 +248,7 @@ class CoinSelection {
     for (let i = 0; i < splitOutputsAmounts.length; i++) {
       createSubSet(utxoSelection, splitOutputsAmounts[i]); // Narrow down for NatToken UTxO
 
-      utxoSelection = select(utxoSelection, splitOutputsAmounts[i], limit, this.protocolParameters);
+      utxoSelection = select(utxoSelection, splitOutputsAmounts[i], limit);
     }
 
     // Phase 2: Improve
@@ -280,7 +257,7 @@ class CoinSelection {
     for (let i = 0; i < splitOutputsAmounts.length; i++) {
       createSubSet(utxoSelection, splitOutputsAmounts[i]); // Narrow down for NatToken UTxO
 
-      let range: any = {};
+      let range = {};
       range.ideal = Loader.CSL.Value.new(
         Loader.CSL.BigNum.from_str('0')
       )
@@ -307,7 +284,7 @@ class CoinSelection {
       let minAmount = Loader.CSL.Value.new(
         Loader.CSL.min_ada_required(
           change,
-          this.protocolParameters.coinsPerUtxoWord
+          Loader.CSL.BigNum.from_str(protocolParameters.coinsPerUtxoWord)
         )
       );
 
@@ -318,7 +295,7 @@ class CoinSelection {
           .checked_add(Loader.CSL.Value.new(utxoSelection.amount.coin()));
 
         createSubSet(utxoSelection, minAda);
-        utxoSelection = select(utxoSelection, minAda, limit, this.protocolParameters);
+        utxoSelection = select(utxoSelection, minAda, limit);
       }
     }
 
@@ -329,33 +306,31 @@ class CoinSelection {
       amount: utxoSelection.amount,
       change: utxoSelection.amount.checked_sub(mergedOutputsAmounts),
     };
-  }
-
-  splitAmounts = splitAmounts
-  compare = compare
+  },
+  splitAmounts: splitAmounts,
+  compare: compare,
 };
 
 /**
  * Use randomSelect & descSelect algorithm to select enough UTxO to fulfill requested outputs
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
- * @param {int} limit - A limit on the number of inputs that can be selected.
+ * @param {number} limit - A limit on the number of inputs that can be selected.
  * @throws INPUT_LIMIT_EXCEEDED if the number of randomly picked inputs exceed 'limit' parameter.
  * @throws INPUTS_EXHAUSTED if all UTxO doesn't hold enough funds to pay for output.
  * @return {UTxOSelection} - Successful random utxo selection.
  */
-function select(utxoSelection: UTxOSelection, outputAmount: Value, limit: number, protocolParameters: ProtocolParameters): UTxOSelection {
+function select(utxoSelection, outputAmount, limit) {
   try {
     utxoSelection = randomSelect(
       cloneUTxOSelection(utxoSelection), // Deep copy in case of fallback needed
       outputAmount,
-      limit - utxoSelection.selection.length,
-      protocolParameters
+      limit - utxoSelection.selection.length
     );
   } catch (e) {
     if (e.message === 'INPUT_LIMIT_EXCEEDED') {
       // Limit reached : Fallback on DescOrdAlgo
-      utxoSelection = descSelect(utxoSelection, outputAmount, protocolParameters);
+      utxoSelection = descSelect(utxoSelection, outputAmount);
     } else {
       throw e;
     }
@@ -368,15 +343,15 @@ function select(utxoSelection: UTxOSelection, outputAmount: Value, limit: number
  * Randomly select enough UTxO to fulfill requested outputs
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
- * @param {int} limit - A limit on the number of inputs that can be selected.
+ * @param {number} limit - A limit on the number of inputs that can be selected.
  * @throws INPUT_LIMIT_EXCEEDED if the number of randomly picked inputs exceed 'limit' parameter.
  * @throws INPUTS_EXHAUSTED if all UTxO doesn't hold enough funds to pay for output.
  * @return {UTxOSelection} - Successful random utxo selection.
  */
-function randomSelect(utxoSelection: UTxOSelection, outputAmount: Value, limit: number, protocolParameters: ProtocolParameters): UTxOSelection {
+function randomSelect(utxoSelection, outputAmount, limit) {
   let nbFreeUTxO = utxoSelection.subset.length;
   // If quantity is met, return subset into remaining list and exit
-  if (isQtyFulfilled(outputAmount, utxoSelection.amount, nbFreeUTxO, protocolParameters)) {
+  if (isQtyFulfilled(outputAmount, utxoSelection.amount, nbFreeUTxO)) {
     utxoSelection.remaining = [
       ...utxoSelection.remaining,
       ...utxoSelection.subset,
@@ -404,7 +379,7 @@ function randomSelect(utxoSelection: UTxOSelection, outputAmount: Value, limit: 
     utxoSelection.amount
   );
 
-  return randomSelect(utxoSelection, outputAmount, limit - 1, protocolParameters);
+  return randomSelect(utxoSelection, outputAmount, limit - 1);
 }
 
 /**
@@ -414,7 +389,7 @@ function randomSelect(utxoSelection: UTxOSelection, outputAmount: Value, limit: 
  * @throws INPUTS_EXHAUSTED if all UTxO doesn't hold enough funds to pay for output.
  * @return {UTxOSelection} - Successful random utxo selection.
  */
-function descSelect(utxoSelection: UTxOSelection, outputAmount: Value, protocolParameters: ProtocolParameters): UTxOSelection {
+function descSelect(utxoSelection, outputAmount) {
   // Sort UTxO subset in DESC order for required Output unit type
   utxoSelection.subset = utxoSelection.subset.sort((a, b) => {
     return Number(
@@ -440,8 +415,7 @@ function descSelect(utxoSelection: UTxOSelection, outputAmount: Value, protocolP
     !isQtyFulfilled(
       outputAmount,
       utxoSelection.amount,
-      utxoSelection.subset.length - 1,
-      protocolParameters
+      utxoSelection.subset.length - 1
     )
   );
 
@@ -459,10 +433,10 @@ function descSelect(utxoSelection: UTxOSelection, outputAmount: Value, protocolP
  * Try to improve selection by increasing input amount in [2x,3x] range.
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
- * @param {int} limit - A limit on the number of inputs that can be selected.
+ * @param {number} limit - A limit on the number of inputs that can be selected.
  * @param {ImproveRange} range - Improvement range target values
  */
-function improve(utxoSelection: UTxOSelection, outputAmount: Value, limit: number, range: ImproveRange): void {
+function improve(utxoSelection, outputAmount, limit, range) {
   let nbFreeUTxO = utxoSelection.subset.length;
 
   if (
@@ -514,7 +488,7 @@ function improve(utxoSelection: UTxOSelection, outputAmount: Value, limit: numbe
  * @param {TransactionOutputs} outputs - The set of outputs requested for payment.
  * @return {Value} - The compiled set of amounts requested for payment.
  */
-function mergeOutputsAmounts(outputs: TransactionOutputs): Value {
+function mergeOutputsAmounts(outputs) {
   let compiledAmountList = Loader.CSL.Value.new(
     Loader.CSL.BigNum.from_str('0')
   );
@@ -535,7 +509,7 @@ function mergeOutputsAmounts(outputs: TransactionOutputs): Value {
  * @param {Value} compiledAmounts - The compiled set of amounts.
  * @return {Value}
  */
-function addAmounts(amounts: Value, compiledAmounts: Value): Value {
+function addAmounts(amounts, compiledAmounts) {
   return compiledAmounts.checked_add(amounts);
 }
 
@@ -544,7 +518,7 @@ function addAmounts(amounts: Value, compiledAmounts: Value): Value {
  * @param {Value} amounts - Set of amounts to be split.
  * @return {AmountList}
  */
-function splitAmounts(amounts: Value): AmountList {
+function splitAmounts(amounts) {
   let splitAmounts = [];
 
   if (amounts.multiasset() && amounts.multiasset().len() > 0) {
@@ -598,7 +572,7 @@ function splitAmounts(amounts: Value): AmountList {
  * @param {string} [sortOrder=ASC] - Order
  * @return {AmountList} - The sorted AmountList
  */
-function sortAmountList(amountList: AmountList, sortOrder: string = 'ASC'): AmountList {
+function sortAmountList(amountList, sortOrder = 'ASC') {
   return amountList.sort((a, b) => {
     let sortInt = sortOrder === 'DESC' ? BigInt(-1) : BigInt(1);
     return Number((getAmountValue(a) - getAmountValue(b)) * sortInt);
@@ -610,7 +584,7 @@ function sortAmountList(amountList: AmountList, sortOrder: string = 'ASC'): Amou
  * @param {Value} amount
  * @return {bigint}
  */
-function getAmountValue(amount: Value): bigint {
+function getAmountValue(amount) {
   let val = BigInt(0);
   let lovelace = BigInt(amount.coin().to_str());
 
@@ -631,7 +605,7 @@ function getAmountValue(amount: Value): bigint {
  * @param {Value} haystack
  * @return {bigint}
  */
-function searchAmountValue(needle: Value, haystack: Value): bigint {
+function searchAmountValue(needle, haystack) {
   let val = BigInt(0);
   let lovelace = BigInt(needle.coin().to_str());
 
@@ -656,7 +630,7 @@ function searchAmountValue(needle: Value, haystack: Value): bigint {
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} output - Single compiled output qty requested for payment.
  */
-function createSubSet(utxoSelection: UTxOSelection, output: Value) {
+function createSubSet(utxoSelection, output) {
   if (BigInt(output.coin().to_str()) < BigInt(1)) {
     let subset = [];
     let remaining = [];
@@ -684,21 +658,17 @@ function createSubSet(utxoSelection: UTxOSelection, output: Value) {
  * Is Quantity Fulfilled Condition.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
  * @param {Value} cumulatedAmount - Single compiled accumulated UTxO qty.
- * @param {int} nbFreeUTxO - Number of free UTxO available.
+ * @param {number} nbFreeUTxO - Number of free UTxO available.
  * @return {boolean}
  */
-function isQtyFulfilled(outputAmount: Value, cumulatedAmount: Value, nbFreeUTxO: number, protocolParameters: ProtocolParameters): boolean {
+function isQtyFulfilled(outputAmount, cumulatedAmount, nbFreeUTxO) {
   let amount = outputAmount;
 
   if (!outputAmount.multiasset() || outputAmount.multiasset().len() <= 0) {
-    console.log(Loader.CSL.min_ada_required(
-      cumulatedAmount,
-      protocolParameters.coinsPerUtxoWord
-    ));
     let minAmount = Loader.CSL.Value.new(
       Loader.CSL.min_ada_required(
         cumulatedAmount,
-        protocolParameters.coinsPerUtxoWord
+        Loader.CSL.BigNum.from_str(protocolParameters.coinsPerUtxoWord)
       )
     );
 
@@ -707,10 +677,13 @@ function isQtyFulfilled(outputAmount: Value, cumulatedAmount: Value, nbFreeUTxO:
 
     // Try covering the max fees
     if (nbFreeUTxO > 0) {
-      let maxFee = Loader.CSL.Value.new(
-        protocolParameters.minFeeA
-        .checked_mul(protocolParameters.maxTxSize)
-        .checked_add(protocolParameters.minFeeB)
+      let maxFee =
+        BigInt(protocolParameters.minFeeA) *
+        BigInt(protocolParameters.maxTxSize) +
+        BigInt(protocolParameters.minFeeB);
+
+      maxFee = Loader.CSL.Value.new(
+        Loader.CSL.BigNum.from_str(maxFee.toString())
       );
 
       amount = amount.checked_add(maxFee);
@@ -725,7 +698,7 @@ function isQtyFulfilled(outputAmount: Value, cumulatedAmount: Value, nbFreeUTxO:
  * @param {UTxOSelection} utxoSelection
  * @return {UTxOSelection} Clone - Deep copy
  */
-function cloneUTxOSelection(utxoSelection: UTxOSelection): UTxOSelection {
+function cloneUTxOSelection(utxoSelection) {
   return {
     selection: cloneUTxOList(utxoSelection.selection),
     remaining: cloneUTxOList(utxoSelection.remaining),
@@ -739,7 +712,7 @@ function cloneUTxOSelection(utxoSelection: UTxOSelection): UTxOSelection {
  * @param {UTxOList} utxoList
  * @return {UTxOList} Cone - Deep copy
  */
-const cloneUTxOList = (utxoList: UTxOList) =>
+const cloneUTxOList = (utxoList) =>
   utxoList.map((utxo) =>
     Loader.CSL.TransactionUnspentOutput.from_bytes(utxo.to_bytes())
   );
@@ -749,10 +722,10 @@ const cloneUTxOList = (utxoList: UTxOList) =>
  * @param {Value} value
  * @return {Value} Cone - Deep copy
  */
-const cloneValue = (value: Value) => Loader.CSL.Value.from_bytes(value.to_bytes());
+const cloneValue = (value) => Loader.CSL.Value.from_bytes(value.to_bytes());
 
 // Helper
-function abs(big: bigint) {
+function abs(big) {
   return big < 0 ? big * BigInt(-1) : big;
 }
 
@@ -760,9 +733,9 @@ function abs(big: bigint) {
  * Compare a candidate value to the one in a group if present
  * @param {Value} group
  * @param {Value} candidate
- * @return {int} - -1 group lower, 0 equal, 1 group higher, undefined if no match
+ * @return {number} - -1 group lower, 0 equal, 1 group higher, undefined if no match
  */
-function compare(group: Value, candidate: Value): number {
+function compare(group, candidate) {
   let gQty = BigInt(group.coin().to_str());
   let cQty = BigInt(candidate.coin().to_str());
 
@@ -796,7 +769,7 @@ function compare(group: Value, candidate: Value): number {
  * Initialise an empty Value with empty MultiAsset
  * @return {Value} - Initialized empty value
  */
-function createEmptyValue(): Value {
+function createEmptyValue() {
   const value = Loader.CSL.Value.new(Loader.CSL.BigNum.from_str('0'));
   const multiasset = Loader.CSL.MultiAsset.new();
   value.set_multiasset(multiasset);

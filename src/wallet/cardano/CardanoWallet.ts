@@ -1,11 +1,11 @@
 import Wallet from "../Wallet";
 import WalletErrorMessage from "../WalletErrorMessage";
 
-import Loader from "../../../Loader";
-import CoinSelection from "../../../CoinSelection";
+import Loader from "../../common/Loader";
+import CoinSelection from "../../common/CoinSelection";
 import BlockchainProvider from "../../blockchain/BlockchainProvider";
 import BridgeProvider from "../../bridge/BridgeProvider";
-import BridgeSupport from "../interfaces/BridgeSupport";
+import { BridgeSupport } from "../interfaces/BridgeSupport";
 
 import { Asset } from "../../common/types";
 import { CardanoAsset } from "./types";
@@ -69,10 +69,10 @@ class CardanoWallet implements Wallet, BridgeSupport {
             return [];
         }
 
-        const names = [];
-        for (let name of [...SUPPORTED_WALLETS, ...EXPERIMENTAL_WALLETS]) {
+        const names: string[] = [];
+        for (const name of [...SUPPORTED_WALLETS, ...EXPERIMENTAL_WALLETS]) {
             if ((window as any).cardano[name]) {
-                names.push(name as string);
+                names.push(name);
             }
         }
         return names;
@@ -83,7 +83,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
         //     throw WalletErrorMessage.NOT_CONNECTED_WALLET(this.walletName);
         // }
 
-        let networkId: number = -1;
+        let networkId = -1;
 
         switch(this.walletName) {
             case CardanoWalletName.YOROI:
@@ -115,26 +115,22 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     private async enable() {
         if (!await this.isEnabled()) {
-            try {
-                // console.log("wallet:", this.wallet);
+            // console.log("wallet:", this.wallet);
 
-                this.walletApi = await this.wallet.enable();
-                // console.log("walletApi:", this.walletApi);
+            this.walletApi = await this.wallet.enable();
+            // console.log("walletApi:", this.walletApi);
 
 
-                if (this.walletName == CardanoWalletName.YOROI) {
-                    const auth = this.walletApi.auth || this.walletApi.experimental.auth;
+            if (this.walletName == CardanoWalletName.YOROI) {
+                const auth = this.walletApi.auth || this.walletApi.experimental.auth;
 
-                    if (auth) {
-                        this.walletAuth = await auth();
-                        // console.log("walletAuth:", this.walletAuth)
-                    } else {
-                        // console.warn("auth() is undefined");
-                        return;
-                    }
+                if (auth) {
+                    this.walletAuth = await auth();
+                    // console.log("walletAuth:", this.walletAuth)
+                } else {
+                    // console.warn("auth() is undefined");
+                    return;
                 }
-            } catch (error) {
-                throw error;
             }
         }
     }
@@ -206,7 +202,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
         }
 
         return await this.walletApi.getBalance();
-    };
+    }
 
     async getBalance(): Promise<any> {
         const cborBalance = await this._getCborBalance();
@@ -222,7 +218,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     // TODO: replace to util
     private static _valueToAssets(value: any) {
-        const assets = [];
+        const assets: CardanoAsset[] = [];
         assets.push({
             unit: 'lovelace',
             quantity: value.coin().to_str()
@@ -260,11 +256,11 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     async getUtxos() {
         const hexUtxos = await this._getCborUtxos();
-        let Utxos = hexUtxos.map(
+        const Utxos = hexUtxos.map(
             utxo => Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxo))
         );
-        let UTXOS = [];
-        for (let utxo of Utxos) {
+        const UTXOS: {txHash: string, txId: number, amount: any}[] = [];
+        for (const utxo of Utxos) {
             let value = utxo.output().amount();
             let assets = CardanoWallet._valueToAssets(value);
 
@@ -376,17 +372,17 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         metadata: any = undefined,
 
-        ttl: number = 3600,
-        networkId: number = 0
+        ttl = 3600,
+        networkId = 0
     ) {
         // Init transaction builder
-        const protocolParameters = await this.blockchainProvider.getProtocolParameters(networkId);
+        const protocolParameters = await this.blockchainProvider?.getProtocolParameters(networkId);
         // console.log("protocolParameters:", protocolParameters);
         const txBuilder = CardanoWallet._initTxBuilder(protocolParameters);
 
-        const coinSelection = new CoinSelection();
+        // const coinSelection = new CoinSelection();
 
-        coinSelection.setProtocolParameters(
+        CoinSelection.setProtocolParameters(
             protocolParameters.min_utxo.toString(),
             protocolParameters.min_fee_a.toString(),
             protocolParameters.min_fee_b.toString(),
@@ -406,7 +402,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             let lovelace = recipient.amount ? recipient.amount : "1000000";
             let outputValue = Loader.CSL.Value.new(Loader.CSL.BigNum.from_str(lovelace));
 
-            if (((recipient.assets || []).length > 0)) {
+            if ((recipient.assets && recipient.assets.length > 0)) {
                 // console.log(recipient.assets);
                 let multiAsset = CardanoWallet._makeMultiAsset(recipient.assets);
                 outputValue.set_multiasset(multiAsset);
@@ -447,7 +443,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxos))
         );
 
-        const selection = await coinSelection.randomImprove(
+        const selection = await CoinSelection.randomImprove(
             payerUtxos,
             outputs,
             20
@@ -462,7 +458,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             );
         }
 
-        let auxiliaryData = null;
+        let auxiliaryData: any = null;
         if (metadata) {
             auxiliaryData = Loader.CSL.AuxiliaryData.new();
 
@@ -484,7 +480,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             txBuilder.add_output(outputs.get(i));
         }
         
-        const now: number = (await this.blockchainProvider.getLatestBlock(networkId)).slot;
+        const now: number = (await this.blockchainProvider?.getLatestBlock(networkId)).slot;
         txBuilder.set_ttl(now + ttl);
 
         // TODO: add change address
@@ -523,7 +519,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
         witnesses: string[],
         metadata: any = undefined
     ): Promise<string> {
-        let tx = Loader.CSL.Transaction.from_bytes(HexToBuffer(rawTx));
+        const tx = Loader.CSL.Transaction.from_bytes(HexToBuffer(rawTx));
 
         const txWitnesses = tx.witness_set();
         const txVkeys = txWitnesses.vkeys();
@@ -566,7 +562,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             const generalMetadata = Loader.CSL.GeneralTransactionMetadata.new();
             const metadatas = Object.entries(metadata);
 
-            for (let m of metadatas) {
+            for (const m of metadatas) {
                 generalMetadata.insert(
                     Loader.CSL.BigNum.from_str(m[0]),
                     Loader.CSL.encode_json_str_to_metadatum(JSON.stringify(m[1]), 0)

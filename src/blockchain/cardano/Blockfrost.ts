@@ -1,5 +1,4 @@
 import BlockchainProvider from "../BlockchainProvider";
-import { ConfirmationsStatus } from "../types";
 
 import { awaitTimeout } from "../../common/util";
 
@@ -20,14 +19,14 @@ export type BlockfrostApiKey = {
 }
 
 export class Blockfrost implements BlockchainProvider {
-    private blockfrostApiKey: any;
+    private blockfrostApiKey: BlockfrostApiKey;
     
     constructor(blockfrostApiKey: BlockfrostApiKey) {
         this.blockfrostApiKey = blockfrostApiKey;
     }
 
     private async request({
-        // body = null,
+        body = null,
         endpoint = "",
         networkId = 0,
         headers = {},
@@ -45,10 +44,12 @@ export class Blockfrost implements BlockchainProvider {
                     ...headers
                 },
                 method: method,
-                // body
+                body
             })).json();
         } catch (error) {
-            console.error(error);
+            if (error?.status_code != 404) {
+                console.error(error);
+            }
             return null;
         }
     }
@@ -93,19 +94,7 @@ export class Blockfrost implements BlockchainProvider {
         });
         if (!blockInfo) throw BLOCKFROST_ERROR();
 
-        let status: ConfirmationsStatus;
-        if (blockInfo.confirmations < 4) { // < ~5 min
-            status = ConfirmationsStatus.LOW;
-        } else if (blockInfo.confirmations < 10) { // < ~10 min
-            status = ConfirmationsStatus.MEDIUM;
-        } else {
-            status = ConfirmationsStatus.HIGH;
-        }
-
-        return {
-            confirmations: blockInfo.confirmations as number,
-            status: status
-        }
+        return blockInfo.confirmations as number;
     }
 
     async getLatestBlock(networkId = 0) {

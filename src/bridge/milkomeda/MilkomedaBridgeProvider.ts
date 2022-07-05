@@ -1,6 +1,6 @@
-import BridgeProvider from "./BridgeProvider";
+import BridgeProvider from "../BridgeProvider";
 
-import { awaitTimeout } from "../common/util";
+import { awaitTimeout } from "../../common/util";
 
 
 const REQUEST_LIMIT = 100;
@@ -10,7 +10,7 @@ const ERROR = () => new Error("Milkomeda bridge provider error");
 
 class MilkomedaBridgeProvider implements BridgeProvider {
     private async request({
-        //body = null,
+        body = null,
         endpoint = "",
         networkId = 0,
         headers = {},
@@ -26,7 +26,7 @@ class MilkomedaBridgeProvider implements BridgeProvider {
                     ...headers
                 },
                 method: method,
-                //body
+                body
             })).json();
         } catch (error) {
             console.error(error);
