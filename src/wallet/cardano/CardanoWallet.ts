@@ -70,7 +70,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
         }
 
         const names: string[] = [];
-        for (let name of [...SUPPORTED_WALLETS, ...EXPERIMENTAL_WALLETS]) {
+        for (const name of [...SUPPORTED_WALLETS, ...EXPERIMENTAL_WALLETS]) {
             if ((window as any).cardano[name]) {
                 names.push(name);
             }
@@ -83,7 +83,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
         //     throw WalletErrorMessage.NOT_CONNECTED_WALLET(this.walletName);
         // }
 
-        let networkId: number = -1;
+        let networkId = -1;
 
         switch(this.walletName) {
             case CardanoWalletName.YOROI:
@@ -115,26 +115,22 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     private async enable() {
         if (!await this.isEnabled()) {
-            try {
-                // console.log("wallet:", this.wallet);
+            // console.log("wallet:", this.wallet);
 
-                this.walletApi = await this.wallet.enable();
-                // console.log("walletApi:", this.walletApi);
+            this.walletApi = await this.wallet.enable();
+            // console.log("walletApi:", this.walletApi);
 
 
-                if (this.walletName == CardanoWalletName.YOROI) {
-                    const auth = this.walletApi.auth || this.walletApi.experimental.auth;
+            if (this.walletName == CardanoWalletName.YOROI) {
+                const auth = this.walletApi.auth || this.walletApi.experimental.auth;
 
-                    if (auth) {
-                        this.walletAuth = await auth();
-                        // console.log("walletAuth:", this.walletAuth)
-                    } else {
-                        // console.warn("auth() is undefined");
-                        return;
-                    }
+                if (auth) {
+                    this.walletAuth = await auth();
+                    // console.log("walletAuth:", this.walletAuth)
+                } else {
+                    // console.warn("auth() is undefined");
+                    return;
                 }
-            } catch (error) {
-                throw error;
             }
         }
     }
@@ -206,7 +202,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
         }
 
         return await this.walletApi.getBalance();
-    };
+    }
 
     async getBalance(): Promise<any> {
         const cborBalance = await this._getCborBalance();
@@ -260,11 +256,11 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     async getUtxos() {
         const hexUtxos = await this._getCborUtxos();
-        let Utxos = hexUtxos.map(
+        const Utxos = hexUtxos.map(
             utxo => Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxo))
         );
-        let UTXOS: any[] = [];
-        for (let utxo of Utxos) {
+        const UTXOS: {txHash: string, txId: number, amount: any}[] = [];
+        for (const utxo of Utxos) {
             let value = utxo.output().amount();
             let assets = CardanoWallet._valueToAssets(value);
 
@@ -376,8 +372,8 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         metadata: any = undefined,
 
-        ttl: number = 3600,
-        networkId: number = 0
+        ttl = 3600,
+        networkId = 0
     ) {
         // Init transaction builder
         const protocolParameters = await this.blockchainProvider?.getProtocolParameters(networkId);
@@ -523,7 +519,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
         witnesses: string[],
         metadata: any = undefined
     ): Promise<string> {
-        let tx = Loader.CSL.Transaction.from_bytes(HexToBuffer(rawTx));
+        const tx = Loader.CSL.Transaction.from_bytes(HexToBuffer(rawTx));
 
         const txWitnesses = tx.witness_set();
         const txVkeys = txWitnesses.vkeys();
@@ -566,7 +562,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             const generalMetadata = Loader.CSL.GeneralTransactionMetadata.new();
             const metadatas = Object.entries(metadata);
 
-            for (let m of metadatas) {
+            for (const m of metadatas) {
                 generalMetadata.insert(
                     Loader.CSL.BigNum.from_str(m[0]),
                     Loader.CSL.encode_json_str_to_metadatum(JSON.stringify(m[1]), 0)

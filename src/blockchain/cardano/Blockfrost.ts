@@ -47,7 +47,9 @@ export class Blockfrost implements BlockchainProvider {
                 body
             })).json();
         } catch (error) {
-            console.error(error);
+            if (error?.status_code != 404) {
+                console.error(error);
+            }
             return null;
         }
     }
