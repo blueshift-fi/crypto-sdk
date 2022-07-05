@@ -177,7 +177,7 @@ import Loader from './Loader';
 /**
  * @typedef {Object} SelectionResult - Coin Selection algorithm return
  * @property {UTxOList} input - Accumulated UTxO set.
- * @property {TransactionOutput[]} output - Requested outputs.
+ * @property {TransactionOutputs} output - Requested outputs.
  * @property {UTxOList} remaining - Remaining UTxO set.
  * @property {Value} amount - UTxO amount of each requested token
  * @property {Value} change - Accumulated change amount.
