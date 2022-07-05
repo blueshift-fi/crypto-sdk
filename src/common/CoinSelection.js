@@ -1,6 +1,5 @@
 import {
   TransactionUnspentOutput,
-  TransactionOutput,
   TransactionOutputs,
   Value,
 } from '@emurgo/cardano-serialization-lib-browser/cardano_serialization_lib';
@@ -285,7 +284,6 @@ const CoinSelection = {
       let minAmount = Loader.CSL.Value.new(
         Loader.CSL.min_ada_required(
           change,
-          false,
           Loader.CSL.BigNum.from_str(protocolParameters.coinsPerUtxoWord)
         )
       );
@@ -670,7 +668,6 @@ function isQtyFulfilled(outputAmount, cumulatedAmount, nbFreeUTxO) {
     let minAmount = Loader.CSL.Value.new(
       Loader.CSL.min_ada_required(
         cumulatedAmount,
-        false,
         Loader.CSL.BigNum.from_str(protocolParameters.coinsPerUtxoWord)
       )
     );
