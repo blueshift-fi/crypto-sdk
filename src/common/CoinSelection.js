@@ -1,5 +1,6 @@
 import {
   TransactionUnspentOutput,
+  TransactionOutput,
   TransactionOutputs,
   Value,
 } from '@emurgo/cardano-serialization-lib-browser/cardano_serialization_lib';
@@ -177,7 +178,7 @@ import Loader from './Loader';
 /**
  * @typedef {Object} SelectionResult - Coin Selection algorithm return
  * @property {UTxOList} input - Accumulated UTxO set.
- * @property {OutputList} output - Requested outputs.
+ * @property {TransactionOutput[]} output - Requested outputs.
  * @property {UTxOList} remaining - Remaining UTxO set.
  * @property {Value} amount - UTxO amount of each requested token
  * @property {Value} change - Accumulated change amount.
@@ -185,10 +186,10 @@ import Loader from './Loader';
 
 /**
  * @typedef {Object} ProtocolParameters
- * @property {int} coinsPerUtxoWord
- * @property {int} minFeeA
- * @property {int} minFeeB
- * @property {int} maxTxSize
+ * @property {number} coinsPerUtxoWord
+ * @property {number} minFeeA
+ * @property {number} minFeeB
+ * @property {number} maxTxSize
  */
 
 /**
@@ -220,7 +221,7 @@ const CoinSelection = {
    * Random-Improve coin selection algorithm
    * @param {UTxOList} inputs - The set of inputs available for selection.
    * @param {TransactionOutputs} outputs - The set of outputs requested for payment.
-   * @param {int} limit - A limit on the number of inputs that can be selected.
+   * @param {number} limit - A limit on the number of inputs that can be selected.
    * @return {SelectionResult} - Coin Selection algorithm return
    */
   randomImprove: async (inputs, outputs, limit) => {
@@ -316,7 +317,7 @@ const CoinSelection = {
  * Use randomSelect & descSelect algorithm to select enough UTxO to fulfill requested outputs
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
- * @param {int} limit - A limit on the number of inputs that can be selected.
+ * @param {number} limit - A limit on the number of inputs that can be selected.
  * @throws INPUT_LIMIT_EXCEEDED if the number of randomly picked inputs exceed 'limit' parameter.
  * @throws INPUTS_EXHAUSTED if all UTxO doesn't hold enough funds to pay for output.
  * @return {UTxOSelection} - Successful random utxo selection.
@@ -344,7 +345,7 @@ function select(utxoSelection, outputAmount, limit) {
  * Randomly select enough UTxO to fulfill requested outputs
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
- * @param {int} limit - A limit on the number of inputs that can be selected.
+ * @param {number} limit - A limit on the number of inputs that can be selected.
  * @throws INPUT_LIMIT_EXCEEDED if the number of randomly picked inputs exceed 'limit' parameter.
  * @throws INPUTS_EXHAUSTED if all UTxO doesn't hold enough funds to pay for output.
  * @return {UTxOSelection} - Successful random utxo selection.
@@ -434,7 +435,7 @@ function descSelect(utxoSelection, outputAmount) {
  * Try to improve selection by increasing input amount in [2x,3x] range.
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
- * @param {int} limit - A limit on the number of inputs that can be selected.
+ * @param {number} limit - A limit on the number of inputs that can be selected.
  * @param {ImproveRange} range - Improvement range target values
  */
 function improve(utxoSelection, outputAmount, limit, range) {
@@ -659,7 +660,7 @@ function createSubSet(utxoSelection, output) {
  * Is Quantity Fulfilled Condition.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
  * @param {Value} cumulatedAmount - Single compiled accumulated UTxO qty.
- * @param {int} nbFreeUTxO - Number of free UTxO available.
+ * @param {number} nbFreeUTxO - Number of free UTxO available.
  * @return {boolean}
  */
 function isQtyFulfilled(outputAmount, cumulatedAmount, nbFreeUTxO) {
@@ -735,7 +736,7 @@ function abs(big) {
  * Compare a candidate value to the one in a group if present
  * @param {Value} group
  * @param {Value} candidate
- * @return {int} - -1 group lower, 0 equal, 1 group higher, undefined if no match
+ * @return {number} - -1 group lower, 0 equal, 1 group higher, undefined if no match
  */
 function compare(group, candidate) {
   let gQty = BigInt(group.coin().to_str());
