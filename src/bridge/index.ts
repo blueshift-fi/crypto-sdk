@@ -1,10 +1,10 @@
 export * from './types';
 
 // Interfaces
-export * from './BridgeProvider';
+export { default as BridgeProvider } from './BridgeProvider';
 
 // Implementations
-export * from './milkomeda/MilkomedaBridgeProvider';
+export { default as MilkomedaBridgeProvider } from './milkomeda/MilkomedaBridgeProvider';
 
 // Config
 // export * from './config';
