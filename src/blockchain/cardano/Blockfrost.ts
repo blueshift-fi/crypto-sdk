@@ -121,4 +121,14 @@ export class Blockfrost implements BlockchainProvider {
         if (!protocolParameters) throw BLOCKFROST_ERROR();
         return protocolParameters;
     }
+
+    async getAddressUtxos(address: string, networkId = 0) {
+        const utxos = await this.request({
+            endpoint: `/addresses/${address}/utxos`,
+            networkId: networkId,
+            method: "GET"
+        });
+        if (!utxos) throw BLOCKFROST_ERROR();
+        return utxos;
+    }
 }

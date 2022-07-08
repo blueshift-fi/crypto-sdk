@@ -11,7 +11,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "lint": "eslint . --ext .ts"
   },
   "repository": {
     "type": "git",
@@ -27,6 +28,9 @@
     "buffer": "^6.0.3"
   },
   "devDependencies": {
-    "@types/node": "^18.0.1"
+    "@types/node": "^18.0.1",
+    "@typescript-eslint/eslint-plugin": "^5.30.5",
+    "@typescript-eslint/parser": "^5.30.5",
+    "eslint": "^8.19.0"
   }
 }

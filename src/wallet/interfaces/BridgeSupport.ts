@@ -1,17 +1,23 @@
+import { BlockchainProvider } from "../../blockchain";
 import BridgeProvider from "../../bridge/BridgeProvider";
 import { BridgeName, ChainName } from "../../bridge/types";
 import { Asset } from "../../common/types";
 
 
+export type Transaction = {
+    hash: string;
+    wait: (blockchainProvider?: any) => Promise<string>;
+}
+
 export type BridgeResponse = {
     from: {
         chain: ChainName,
-        txHash: string,
+        tx?: Transaction,
         fee: Asset
     },
     to: {
         chain: ChainName,
-        txHash: Promise<string>,
+        tx?: Promise<Transaction>,
         fee: Asset
     },
     by: BridgeName
