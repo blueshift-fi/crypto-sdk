@@ -1,4 +1,5 @@
 
+
 interface BlockchainProvider {
     getProtocolParameters(networkId: number): Promise<any>;
 

@@ -2,10 +2,10 @@ import Wallet from "../Wallet";
 import WalletErrorMessage from "../WalletErrorMessage";
 
 import Loader from "../../common/Loader";
-import CoinSelection from "../../common/CoinSelection";
-import BlockchainProvider from "../../blockchain/BlockchainProvider";
+import CoinSelection from "../../common/cardano/CoinSelection";
+import BlockchainProvider from "../../blockchain/interfaces/BlockchainProvider";
 import BridgeProvider from "../../bridge/BridgeProvider";
-import { BridgeSupport } from "../interfaces/BridgeSupport";
+import { BridgeResponse, BridgeSupport, Transaction } from "../interfaces/BridgeSupport";
 
 import { Asset } from "../../common/types";
 import { CardanoAsset } from "./types";
@@ -87,8 +87,14 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         switch(this.walletName) {
             case CardanoWalletName.YOROI:
-                networkId = 0;
+                const cborAddresses = await this._getCborUsedAddresses();
+                console.log(cborAddresses);
+                console.log(cborAddresses[0]);
+                networkId = Loader.CSL.Address.from_bytes(
+                    HexToBuffer(cborAddresses[0])
+                ).network_id() as number;
                 break;
+
             default:
                 networkId = await this.walletApi.getNetworkId() as number;
                 break;
@@ -169,7 +175,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     /* ACCOUNT INFO */
 
-    private async _getCborUsedAddresses() {
+    private async _getCborUsedAddresses(): Promise<string[]> {
         if (!await this.isEnabled()) {
             throw WalletErrorMessage.NOT_CONNECTED_WALLET(this.name());
         }
@@ -204,7 +210,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
         return await this.walletApi.getBalance();
     }
 
-    async getBalance(): Promise<any> {
+    async getBalance(): Promise<CardanoAsset[]> {
         const cborBalance = await this._getCborBalance();
         const value = Loader.CSL.Value.from_bytes(HexToBuffer(cborBalance));
         return CardanoWallet._valueToAssets(value);
@@ -425,16 +431,6 @@ class CardanoWallet implements Wallet, BridgeSupport {
             }
         }
 
-        // TODO: temporary solution
-        if (((recipients[0].assets || []).length > 0)) {
-            outputs.add(
-                Loader.CSL.TransactionOutput.new(
-                    Loader.CSL.Address.from_bech32(payer.address),
-                    Loader.CSL.Value.new(Loader.CSL.BigNum.from_str("3000000"))
-                )
-            );
-        }
-
 
         // TODO: add script handling
 
@@ -587,7 +583,6 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async bridge(
-        // amount: string,
         asset: Asset,
         to: {
             address: string,
@@ -626,21 +621,17 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         const buildedTx = await this.buildTx(payer, [recipient], metadata, options.ttl, networkId);
 
-        const res = {
+        const res: BridgeResponse = {
             from: {
                 chain: networkId ? ChainName.Cardano : ChainName.CardanoTestnet,
-                txHash: "unknown",
                 fee: {
                     token: networkId ? "ADA" : "TADA",
-                    quantity: buildedTx.fee,
+                    quantity: buildedTx.fee as string,
                     decimals: 6
                 }
             },
             to: {
                 chain: networkId ? ChainName.Milkomeda : ChainName.MilkomedaDevnet,
-                txHash: new Promise<string>(() => {
-                    return "unknown";
-                }),
                 fee: {
                     token: networkId ? "milkADA" : "milkTADA",
                     quantity: "100000000000000000",
@@ -653,13 +644,38 @@ class CardanoWallet implements Wallet, BridgeSupport {
         if (!options.isDemo) {
             const witness = await this.signTx(buildedTx.rawTx);
 
-            const txHash = await this.submitTx(
+            const fromTxHash = await this.submitTx(
                 buildedTx.rawTx, [witness], metadata
             );
-            res.from.txHash = txHash;
-            res.to.txHash = this.bridgeProvider ? this.bridgeProvider.getBridgeTxFor(txHash, networkId) : new Promise<string>(() => {
-                return "unknown";
-            });
+            res.from.tx = {
+                hash: fromTxHash,
+                wait: async (blockchainProvider = this.blockchainProvider) => {
+                    return new Promise<string>(async (resolve, reject) => {
+                        if (blockchainProvider) {
+                            resolve(await blockchainProvider.getTxBlockHash(fromTxHash, networkId));
+                        }
+                        reject("BlockchainProvider is undefiend");
+                    })
+                }
+            }
+            if (this.bridgeProvider) {
+                const bp = this.bridgeProvider;
+
+                res.to.tx = new Promise<Transaction> (async (resolve, reject) => {
+                    const toTxHash: string = await bp.getBridgeTxFor(fromTxHash, networkId);
+                    return {
+                        hash: toTxHash,
+                        wait: async (blockchainProvider: any) => {
+                            return new Promise<string>(async (resolve, reject) => {
+                                if (blockchainProvider) {
+                                    resolve(await blockchainProvider.getTransaction(toTxHash).blockHash);
+                                }
+                                reject("BlockchainProvider is undefiend");
+                            })
+                        }
+                    }
+                });
+            }
         }
 
         return res;
