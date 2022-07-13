@@ -2,9 +2,9 @@ import {
   TransactionUnspentOutput,
   TransactionOutputs,
   Value,
-} from '@emurgo/cardano-serialization-lib-browser/cardano_serialization_lib';
-import Loader from './Loader';
-
+} from "@emurgo/cardano-serialization-lib-browser/cardano_serialization_lib";
+import Loader from "../Loader";
+const BigInt = typeof window !== "undefined" && window.BigInt;
 /**
  * BerryPool implementation of the __Random-Improve__ coin selection algorithm.
  *
@@ -177,7 +177,7 @@ import Loader from './Loader';
 /**
  * @typedef {Object} SelectionResult - Coin Selection algorithm return
  * @property {UTxOList} input - Accumulated UTxO set.
- * @property {TransactionOutputs} output - Requested outputs.
+ * @property {UTxOList} output - Requested outputs.
  * @property {UTxOList} remaining - Remaining UTxO set.
  * @property {Value} amount - UTxO amount of each requested token
  * @property {Value} change - Accumulated change amount.
@@ -185,7 +185,7 @@ import Loader from './Loader';
 
 /**
  * @typedef {Object} ProtocolParameters
- * @property {number} coinsPerUtxoWord
+ * @property {number} minUTxO
  * @property {number} minFeeA
  * @property {number} minFeeB
  * @property {number} maxTxSize
@@ -198,19 +198,19 @@ let protocolParameters = null;
 
 /**
  * CoinSelection Module.
- * @module CoinSelection
+ * @module src/lib/CoinSelection
  */
 const CoinSelection = {
   /**
    * Set protocol parameters required by the algorithm
-   * @param {string} coinsPerUtxoWord
+   * @param {string} minUTxO
    * @param {string} minFeeA
    * @param {string} minFeeB
    * @param {string} maxTxSize
    */
-  setProtocolParameters: (coinsPerUtxoWord, minFeeA, minFeeB, maxTxSize) => {
+  setProtocolParameters: (minUTxO, minFeeA, minFeeB, maxTxSize) => {
     protocolParameters = {
-      coinsPerUtxoWord: coinsPerUtxoWord,
+      minUTxO: minUTxO,
       minFeeA: minFeeA,
       minFeeB: minFeeB,
       maxTxSize: maxTxSize,
@@ -226,17 +226,20 @@ const CoinSelection = {
   randomImprove: async (inputs, outputs, limit) => {
     if (!protocolParameters)
       throw new Error(
-        'Protocol parameters not set. Use setProtocolParameters().'
+        "Protocol parameters not set. Use setProtocolParameters()."
       );
 
     await Loader.load();
+
+    const _minUTxOValue =
+      BigInt(outputs.len()) * BigInt(protocolParameters.minUTxO);
 
     /** @type {UTxOSelection} */
     let utxoSelection = {
       selection: [],
       remaining: [...inputs], // Shallow copy
       subset: [],
-      amount: createEmptyValue(),
+      amount: Loader.CSL.Value.new(Loader.CSL.BigNum.from_str("0")),
     };
 
     let mergedOutputsAmounts = mergeOutputsAmounts(outputs);
@@ -244,60 +247,57 @@ const CoinSelection = {
     // Explode amount in an array of unique asset amount for comparison's sake
     let splitOutputsAmounts = splitAmounts(mergedOutputsAmounts);
 
-    // Phase 1: Select enough input
-    for (let i = 0; i < splitOutputsAmounts.length; i++) {
-      createSubSet(utxoSelection, splitOutputsAmounts[i]); // Narrow down for NatToken UTxO
+    // Phase 1: RandomSelect
+    splitOutputsAmounts.forEach((output) => {
+      createSubSet(utxoSelection, output); // Narrow down for NatToken UTxO
 
-      utxoSelection = select(utxoSelection, splitOutputsAmounts[i], limit);
-    }
+      try {
+        utxoSelection = randomSelect(
+          cloneUTxOSelection(utxoSelection), // Deep copy in case of fallback needed
+          output,
+          limit - utxoSelection.selection.length,
+          _minUTxOValue
+        );
+      } catch (e) {
+        if (e.message === "INPUT_LIMIT_EXCEEDED") {
+          // Limit reached : Fallback on DescOrdAlgo
+          utxoSelection = descSelect(
+            utxoSelection,
+            output,
+            limit - utxoSelection.selection.length,
+            _minUTxOValue
+          );
+        } else {
+          throw e;
+        }
+      }
+    });
 
     // Phase 2: Improve
     splitOutputsAmounts = sortAmountList(splitOutputsAmounts);
 
-    for (let i = 0; i < splitOutputsAmounts.length; i++) {
-      createSubSet(utxoSelection, splitOutputsAmounts[i]); // Narrow down for NatToken UTxO
+    splitOutputsAmounts.forEach((output) => {
+      createSubSet(utxoSelection, output); // Narrow down for NatToken UTxO
 
       let range = {};
       range.ideal = Loader.CSL.Value.new(
-        Loader.CSL.BigNum.from_str('0')
+        Loader.CSL.BigNum.from_str("0")
       )
-        .checked_add(splitOutputsAmounts[i])
-        .checked_add(splitOutputsAmounts[i]);
+        .checked_add(output)
+        .checked_add(output);
       range.maximum = Loader.CSL.Value.new(
-        Loader.CSL.BigNum.from_str('0')
+        Loader.CSL.BigNum.from_str("0")
       )
         .checked_add(range.ideal)
-        .checked_add(splitOutputsAmounts[i]);
+        .checked_add(output);
 
       improve(
         utxoSelection,
-        splitOutputsAmounts[i],
+        output,
         limit - utxoSelection.selection.length,
         range
       );
-    }
-
-    // Insure change hold enough Ada to cover included native assets and fees
-    if (utxoSelection.remaining.length > 0) {
-      const change = utxoSelection.amount.checked_sub(mergedOutputsAmounts);
-
-      let minAmount = Loader.CSL.Value.new(
-        Loader.CSL.min_ada_required(
-          change,
-          Loader.CSL.BigNum.from_str(protocolParameters.coinsPerUtxoWord)
-        )
-      );
-
-      if (compare(change, minAmount) < 0) {
-        // Not enough, add missing amount and run select one last time
-        const minAda = minAmount
-          .checked_sub(Loader.CSL.Value.new(change.coin()))
-          .checked_add(Loader.CSL.Value.new(utxoSelection.amount.coin()));
-
-        createSubSet(utxoSelection, minAda);
-        utxoSelection = select(utxoSelection, minAda, limit);
-      }
-    }
+    });
 
     return {
       input: utxoSelection.selection,
@@ -307,51 +307,25 @@ const CoinSelection = {
       change: utxoSelection.amount.checked_sub(mergedOutputsAmounts),
     };
   },
-  splitAmounts: splitAmounts,
-  compare: compare,
 };
-
-/**
- * Use randomSelect & descSelect algorithm to select enough UTxO to fulfill requested outputs
- * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
- * @param {Value} outputAmount - Single compiled output qty requested for payment.
- * @param {number} limit - A limit on the number of inputs that can be selected.
- * @throws INPUT_LIMIT_EXCEEDED if the number of randomly picked inputs exceed 'limit' parameter.
- * @throws INPUTS_EXHAUSTED if all UTxO doesn't hold enough funds to pay for output.
- * @return {UTxOSelection} - Successful random utxo selection.
- */
-function select(utxoSelection, outputAmount, limit) {
-  try {
-    utxoSelection = randomSelect(
-      cloneUTxOSelection(utxoSelection), // Deep copy in case of fallback needed
-      outputAmount,
-      limit - utxoSelection.selection.length
-    );
-  } catch (e) {
-    if (e.message === 'INPUT_LIMIT_EXCEEDED') {
-      // Limit reached : Fallback on DescOrdAlgo
-      utxoSelection = descSelect(utxoSelection, outputAmount);
-    } else {
-      throw e;
-    }
-  }
-
-  return utxoSelection;
-}
 
 /**
  * Randomly select enough UTxO to fulfill requested outputs
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
- * @param {number} limit - A limit on the number of inputs that can be selected.
+ * @param {int} limit - A limit on the number of inputs that can be selected.
+ * @param {int} minUTxOValue - Network protocol 'minUTxOValue' current value.
  * @throws INPUT_LIMIT_EXCEEDED if the number of randomly picked inputs exceed 'limit' parameter.
  * @throws INPUTS_EXHAUSTED if all UTxO doesn't hold enough funds to pay for output.
+ * @throws MIN_UTXO_ERROR if lovelace change is under 'minUTxOValue' parameter.
  * @return {UTxOSelection} - Successful random utxo selection.
  */
-function randomSelect(utxoSelection, outputAmount, limit) {
+function randomSelect(utxoSelection, outputAmount, limit, minUTxOValue) {
   let nbFreeUTxO = utxoSelection.subset.length;
   // If quantity is met, return subset into remaining list and exit
-  if (isQtyFulfilled(outputAmount, utxoSelection.amount, nbFreeUTxO)) {
+  if (
+    isQtyFulfilled(outputAmount, utxoSelection.amount, minUTxOValue, nbFreeUTxO)
+  ) {
     utxoSelection.remaining = [
       ...utxoSelection.remaining,
       ...utxoSelection.subset,
@@ -361,11 +335,14 @@ function randomSelect(utxoSelection, outputAmount, limit) {
   }
 
   if (limit <= 0) {
-    throw new Error('INPUT_LIMIT_EXCEEDED');
+    throw new Error("INPUT_LIMIT_EXCEEDED");
   }
 
   if (nbFreeUTxO <= 0) {
-    throw new Error('INPUTS_EXHAUSTED');
+    if (isQtyFulfilled(outputAmount, utxoSelection.amount, 0, 0)) {
+      throw new Error("MIN_UTXO_ERROR");
+    }
+    throw new Error("INPUTS_EXHAUSTED");
   }
 
   /** @type {TransactionUnspentOutput} utxo */
@@ -379,28 +356,36 @@ function randomSelect(utxoSelection, outputAmount, limit) {
     utxoSelection.amount
   );
 
-  return randomSelect(utxoSelection, outputAmount, limit - 1);
+  return randomSelect(utxoSelection, outputAmount, limit - 1, minUTxOValue);
 }
 
 /**
  * Select enough UTxO in DESC order to fulfill requested outputs
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
+ * @param {int} limit - A limit on the number of inputs that can be selected.
+ * @param {int} minUTxOValue - Network protocol 'minUTxOValue' current value.
+ * @throws INPUT_LIMIT_EXCEEDED if the number of randomly picked inputs exceed 'limit' parameter.
  * @throws INPUTS_EXHAUSTED if all UTxO doesn't hold enough funds to pay for output.
+ * @throws MIN_UTXO_ERROR if lovelace change is under 'minUTxOValue' parameter.
  * @return {UTxOSelection} - Successful random utxo selection.
  */
-function descSelect(utxoSelection, outputAmount) {
+function descSelect(utxoSelection, outputAmount, limit, minUTxOValue) {
   // Sort UTxO subset in DESC order for required Output unit type
-  utxoSelection.subset = utxoSelection.subset.sort((a, b) => {
-    return Number(
-      searchAmountValue(outputAmount, b.output().amount()) -
-      searchAmountValue(outputAmount, a.output().amount())
-    );
-  });
+  utxoSelection.subset = utxoSelection.subset.sort((utxoA, utxoB) =>
+    utxoB.output().amount().compare(utxoA.output().amount())
+  );
 
   do {
+    if (limit <= 0) {
+      throw new Error("INPUT_LIMIT_EXCEEDED");
+    }
+
     if (utxoSelection.subset.length <= 0) {
-      throw new Error('INPUTS_EXHAUSTED');
+      if (isQtyFulfilled(outputAmount, utxoSelection.amount, 0, 0)) {
+        throw new Error("MIN_UTXO_ERROR");
+      }
+      throw new Error("INPUTS_EXHAUSTED");
     }
 
     /** @type {TransactionUnspentOutput} utxo */
@@ -411,10 +396,13 @@ function descSelect(utxoSelection, outputAmount) {
       utxo.output().amount(),
       utxoSelection.amount
     );
+
+    limit--;
   } while (
     !isQtyFulfilled(
       outputAmount,
       utxoSelection.amount,
+      minUTxOValue,
       utxoSelection.subset.length - 1
     )
   );
@@ -433,14 +421,14 @@ function descSelect(utxoSelection, outputAmount) {
  * Try to improve selection by increasing input amount in [2x,3x] range.
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
- * @param {number} limit - A limit on the number of inputs that can be selected.
+ * @param {int} limit - A limit on the number of inputs that can be selected.
  * @param {ImproveRange} range - Improvement range target values
  */
 function improve(utxoSelection, outputAmount, limit, range) {
   let nbFreeUTxO = utxoSelection.subset.length;
 
   if (
-    compare(utxoSelection.amount, range.ideal) >= 0 ||
+    utxoSelection.amount.compare(range.ideal) >= 0 ||
     nbFreeUTxO <= 0 ||
     limit <= 0
   ) {
@@ -460,15 +448,15 @@ function improve(utxoSelection, outputAmount, limit, range) {
     .pop();
 
   const newAmount = Loader.CSL.Value.new(
-    Loader.CSL.BigNum.from_str('0')
+    Loader.CSL.BigNum.from_str("0")
   )
     .checked_add(utxo.output().amount())
     .checked_add(outputAmount);
 
   if (
     abs(getAmountValue(range.ideal) - getAmountValue(newAmount)) <
-    abs(getAmountValue(range.ideal) - getAmountValue(outputAmount)) &&
-    compare(newAmount, range.maximum) <= 0
+      abs(getAmountValue(range.ideal) - getAmountValue(outputAmount)) &&
+    newAmount.compare(range.maximum) <= 0
   ) {
     utxoSelection.selection.push(utxo);
     utxoSelection.amount = addAmounts(
@@ -490,7 +478,7 @@ function improve(utxoSelection, outputAmount, limit, range) {
  */
 function mergeOutputsAmounts(outputs) {
   let compiledAmountList = Loader.CSL.Value.new(
-    Loader.CSL.BigNum.from_str('0')
+    Loader.CSL.BigNum.from_str("0")
   );
 
   for (let i = 0; i < outputs.len(); i++) {
@@ -516,12 +504,13 @@ function addAmounts(amounts, compiledAmounts) {
 /**
  * Split amounts contained in a single {Value} object in separate {Value} objects
  * @param {Value} amounts - Set of amounts to be split.
+ * @throws MIN_UTXO_ERROR if lovelace change is under 'minUTxOValue' parameter.
  * @return {AmountList}
  */
 function splitAmounts(amounts) {
   let splitAmounts = [];
 
-  if (amounts.multiasset() && amounts.multiasset().len() > 0) {
+  if (amounts.multiasset()) {
     let mA = amounts.multiasset();
 
     for (let i = 0; i < mA.keys().len(); i++) {
@@ -544,7 +533,7 @@ function splitAmounts(amounts) {
           _assets
         );
         let _value = Loader.CSL.Value.new(
-          Loader.CSL.BigNum.from_str('0')
+          Loader.CSL.BigNum.from_str("0")
         );
         _value.set_multiasset(_multiasset);
 
@@ -554,7 +543,7 @@ function splitAmounts(amounts) {
   }
 
   // Order assets by qty DESC
-  splitAmounts = sortAmountList(splitAmounts, 'DESC');
+  splitAmounts = sortAmountList(splitAmounts, "DESC");
 
   // Insure lovelace is last to account for min ada requirement
   splitAmounts.push(
@@ -572,16 +561,16 @@ function splitAmounts(amounts) {
  * @param {string} [sortOrder=ASC] - Order
  * @return {AmountList} - The sorted AmountList
  */
-function sortAmountList(amountList, sortOrder = 'ASC') {
+function sortAmountList(amountList, sortOrder = "ASC") {
   return amountList.sort((a, b) => {
-    let sortInt = sortOrder === 'DESC' ? BigInt(-1) : BigInt(1);
+    let sortInt = sortOrder === "DESC" ? BigInt(-1) : BigInt(1);
     return Number((getAmountValue(a) - getAmountValue(b)) * sortInt);
   });
 }
 
 /**
  * Return BigInt amount value
- * @param {Value} amount
+ * @param amount
  * @return {bigint}
  */
 function getAmountValue(amount) {
@@ -600,52 +589,19 @@ function getAmountValue(amount) {
 }
 
 /**
- * Search & Return BigInt amount value
- * @param {Value} needle
- * @param {Value} haystack
- * @return {bigint}
- */
-function searchAmountValue(needle, haystack) {
-  let val = BigInt(0);
-  let lovelace = BigInt(needle.coin().to_str());
-
-  if (lovelace > 0) {
-    val = BigInt(haystack.coin().to_str());
-  } else if (
-    needle.multiasset() &&
-    haystack.multiasset() &&
-    needle.multiasset().len() > 0 &&
-    haystack.multiasset().len() > 0
-  ) {
-    let scriptHash = needle.multiasset().keys().get(0);
-    let assetName = needle.multiasset().get(scriptHash).keys().get(0);
-    val = BigInt(haystack.multiasset().get(scriptHash).get(assetName).to_str());
-  }
-
-  return val;
-}
-
-/**
  * Narrow down remaining UTxO set in case of native token, use full set for lovelace
  * @param {UTxOSelection} utxoSelection - The set of selected/available inputs.
  * @param {Value} output - Single compiled output qty requested for payment.
  */
 function createSubSet(utxoSelection, output) {
   if (BigInt(output.coin().to_str()) < BigInt(1)) {
-    let subset = [];
-    let remaining = [];
-    for (let i = 0; i < utxoSelection.remaining.length; i++) {
-      if (
-        compare(utxoSelection.remaining[i].output().amount(), output) !==
-        undefined
-      ) {
-        subset.push(utxoSelection.remaining[i]);
-      } else {
-        remaining.push(utxoSelection.remaining[i]);
+    utxoSelection.remaining.forEach((utxo, index) => {
+      if (output.compare(utxo.output().amount()) !== undefined) {
+        utxoSelection.subset.push(
+          utxoSelection.remaining.splice(index, 1).pop()
+        );
       }
-    }
-    utxoSelection.subset = subset;
-    utxoSelection.remaining = remaining;
+    });
   } else {
     utxoSelection.subset = utxoSelection.remaining.splice(
       0,
@@ -655,31 +611,46 @@ function createSubSet(utxoSelection, output) {
 }
 
 /**
- * Is Quantity Fulfilled Condition.
+ * Is Quantity Fulfilled Condition - Handle 'minUTxOValue' protocol parameter.
  * @param {Value} outputAmount - Single compiled output qty requested for payment.
  * @param {Value} cumulatedAmount - Single compiled accumulated UTxO qty.
- * @param {number} nbFreeUTxO - Number of free UTxO available.
+ * @param {int} minUTxOValue - Network protocol 'minUTxOValue' current value.
+ * @param {int} nbFreeUTxO - Number of free UTxO available.
  * @return {boolean}
  */
-function isQtyFulfilled(outputAmount, cumulatedAmount, nbFreeUTxO) {
+function isQtyFulfilled(
+  outputAmount,
+  cumulatedAmount,
+  minUTxOValue,
+  nbFreeUTxO
+) {
   let amount = outputAmount;
 
-  if (!outputAmount.multiasset() || outputAmount.multiasset().len() <= 0) {
+  if (minUTxOValue && BigInt(outputAmount.coin().to_str()) > 0) {
     let minAmount = Loader.CSL.Value.new(
       Loader.CSL.min_ada_required(
         cumulatedAmount,
-        Loader.CSL.BigNum.from_str(protocolParameters.coinsPerUtxoWord)
+        Loader.CSL.BigNum.from_str(minUTxOValue.toString())
       )
     );
 
     // Lovelace min amount to cover assets and number of output need to be met
-    if (compare(cumulatedAmount, minAmount) < 0) return false;
+    if (cumulatedAmount.compare(minAmount) < 0) return false;
+
+    // If requested Lovelace lower than minAmount, plan for change
+    if (outputAmount.compare(minAmount) < 0) {
+      amount = minAmount.checked_add(
+        Loader.CSL.Value.new(
+          Loader.CSL.BigNum.from_str(protocolParameters.minUTxO)
+        )
+      );
+    }
 
     // Try covering the max fees
     if (nbFreeUTxO > 0) {
       let maxFee =
         BigInt(protocolParameters.minFeeA) *
-        BigInt(protocolParameters.maxTxSize) +
+          BigInt(protocolParameters.maxTxSize) +
         BigInt(protocolParameters.minFeeB);
 
       maxFee = Loader.CSL.Value.new(
@@ -690,7 +661,7 @@ function isQtyFulfilled(outputAmount, cumulatedAmount, nbFreeUTxO) {
     }
   }
 
-  return compare(cumulatedAmount, amount) >= 0;
+  return cumulatedAmount.compare(amount) >= 0;
 }
 
 /**
@@ -727,53 +698,6 @@ const cloneValue = (value) => Loader.CSL.Value.from_bytes(value.to_bytes());
 // Helper
 function abs(big) {
   return big < 0 ? big * BigInt(-1) : big;
-}
-
-/**
- * Compare a candidate value to the one in a group if present
- * @param {Value} group
- * @param {Value} candidate
- * @return {number} - -1 group lower, 0 equal, 1 group higher, undefined if no match
- */
-function compare(group, candidate) {
-  let gQty = BigInt(group.coin().to_str());
-  let cQty = BigInt(candidate.coin().to_str());
-
-  if (candidate.multiasset() && candidate.multiasset().len() > 0) {
-    let cScriptHash = candidate.multiasset().keys().get(0);
-    let cAssetName = candidate.multiasset().get(cScriptHash).keys().get(0);
-
-    if (group.multiasset() && group.multiasset().len()) {
-      if (
-        group.multiasset().get(cScriptHash) &&
-        group.multiasset().get(cScriptHash).get(cAssetName)
-      ) {
-        gQty = BigInt(
-          group.multiasset().get(cScriptHash).get(cAssetName).to_str()
-        );
-        cQty = BigInt(
-          candidate.multiasset().get(cScriptHash).get(cAssetName).to_str()
-        );
-      } else {
-        return undefined;
-      }
-    } else {
-      return undefined;
-    }
-  }
-
-  return gQty >= cQty ? (gQty === cQty ? 0 : 1) : -1;
-}
-
-/**
- * Initialise an empty Value with empty MultiAsset
- * @return {Value} - Initialized empty value
- */
-function createEmptyValue() {
-  const value = Loader.CSL.Value.new(Loader.CSL.BigNum.from_str('0'));
-  const multiasset = Loader.CSL.MultiAsset.new();
-  value.set_multiasset(multiasset);
-  return value;
 }
 
 export default CoinSelection;

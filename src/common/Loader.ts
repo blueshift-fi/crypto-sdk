@@ -1,3 +1,5 @@
+
+
 class Loader {
     private csl_wasm: any;
 

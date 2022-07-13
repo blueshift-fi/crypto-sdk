@@ -1,4 +1,4 @@
-import BlockchainProvider from "../BlockchainProvider";
+import BlockchainProvider from "../interfaces/BlockchainProvider";
 
 import { awaitTimeout } from "../../common/util";
 

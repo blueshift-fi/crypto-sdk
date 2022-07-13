@@ -2,8 +2,8 @@ import Wallet from "../Wallet";
 import WalletErrorMessage from "../WalletErrorMessage";
 
 import Loader from "../../common/Loader";
-import CoinSelection from "../../common/CoinSelection";
-import BlockchainProvider from "../../blockchain/BlockchainProvider";
+import CoinSelection from "../../common/cardano/CoinSelection";
+import BlockchainProvider from "../../blockchain/interfaces/BlockchainProvider";
 import BridgeProvider from "../../bridge/BridgeProvider";
 import { BridgeResponse, BridgeSupport, Transaction } from "../interfaces/BridgeSupport";
 
@@ -87,8 +87,14 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         switch(this.walletName) {
             case CardanoWalletName.YOROI:
-                networkId = 0;
+                const cborAddresses = await this._getCborUsedAddresses();
+                console.log(cborAddresses);
+                console.log(cborAddresses[0]);
+                networkId = Loader.CSL.Address.from_bytes(
+                    HexToBuffer(cborAddresses[0])
+                ).network_id() as number;
                 break;
+
             default:
                 networkId = await this.walletApi.getNetworkId() as number;
                 break;
@@ -169,7 +175,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     /* ACCOUNT INFO */
 
-    private async _getCborUsedAddresses() {
+    private async _getCborUsedAddresses(): Promise<string[]> {
         if (!await this.isEnabled()) {
             throw WalletErrorMessage.NOT_CONNECTED_WALLET(this.name());
         }
@@ -425,16 +431,6 @@ class CardanoWallet implements Wallet, BridgeSupport {
             }
         }
 
-        // TODO: temporary solution
-        if (((recipients[0].assets || []).length > 0)) {
-            outputs.add(
-                Loader.CSL.TransactionOutput.new(
-                    Loader.CSL.Address.from_bech32(payer.address),
-                    Loader.CSL.Value.new(Loader.CSL.BigNum.from_str("3000000"))
-                )
-            );
-        }
-
 
         // TODO: add script handling
 
@@ -587,7 +583,6 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async bridge(
-        // amount: string,
         asset: Asset,
         to: {
             address: string,
