@@ -4,7 +4,7 @@ import { awaitTimeout } from "../../common/util";
 
 
 const REQUEST_LIMIT = 100;
-const TIMEOUT_LIMIT = 20;
+const TIMEOUT_LIMIT = 30;
 const ERROR = () => new Error("Milkomeda bridge provider error");
 
 
@@ -44,7 +44,7 @@ class MilkomedaBridgeProvider implements BridgeProvider {
 
         // console.log(0, bridgeInfo);
 
-        if (bridgeInfo.requests.length > 0) {
+        if (bridgeInfo.requests.length > 0 && bridgeInfo.requests[0]?.transaction_id !== "") {
             return bridgeInfo.requests[0]?.transaction_id;
         }
 
@@ -59,7 +59,7 @@ class MilkomedaBridgeProvider implements BridgeProvider {
 
             // console.log(i, bridgeInfo);
 
-            if (bridgeInfo.requests.length > 0) {
+            if (bridgeInfo.requests.length > 0 && bridgeInfo.requests[0]?.transaction_id !== "") {
                 return bridgeInfo.requests[0]?.transaction_id;
             }
         }

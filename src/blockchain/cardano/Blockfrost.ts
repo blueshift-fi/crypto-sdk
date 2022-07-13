@@ -4,7 +4,7 @@ import { awaitTimeout } from "../../common/util";
 
 
 const REQUEST_LIMIT = 100;
-const TIMEOUT_LIMIT = 20;
+const TIMEOUT_LIMIT = 30;
 const BLOCKFROST_ERROR = () => new Error("Blockfrost error");
 
 
