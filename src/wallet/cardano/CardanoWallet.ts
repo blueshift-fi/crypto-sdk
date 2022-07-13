@@ -663,17 +663,17 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
                 res.to.tx = new Promise<Transaction> (async (resolve, reject) => {
                     const toTxHash: string = await bp.getBridgeTxFor(fromTxHash, networkId);
-                    return {
+                    resolve ({
                         hash: toTxHash,
                         wait: async (blockchainProvider: any) => {
                             return new Promise<string>(async (resolve, reject) => {
                                 if (blockchainProvider) {
-                                    resolve(await blockchainProvider.getTransaction(toTxHash).blockHash);
+                                    resolve((await blockchainProvider.waitForTransaction(toTxHash)).blockHash);
                                 }
                                 reject("BlockchainProvider is undefiend");
                             })
                         }
-                    }
+                    });
                 });
             }
         }
