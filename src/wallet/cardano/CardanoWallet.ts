@@ -158,9 +158,9 @@ class CardanoWallet implements Wallet, BridgeSupport {
         }
 
         let wallet = (window as any).cardano[walletName];
-        // if (!wallet) {
-        //     throw WalletErrorMessage.NOT_INSTALLED_WALLET(walletName);
-        // }
+        if (!wallet) {
+            throw WalletErrorMessage.NOT_INSTALLED_WALLET(walletName);
+        }
 
         // if (EXPERIMENTAL_WALLETS.includes(walletName)) {
         //     console.warn(`${walletName} may be unstable. Use it carefully.`);
