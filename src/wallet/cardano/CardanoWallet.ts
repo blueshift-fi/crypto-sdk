@@ -47,6 +47,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
     private walletName: CardanoWalletName | undefined;
 
     private blockchainProvider: BlockchainProvider | undefined;
+    private protocolParameters: any;
     private bridgeProvider: BridgeProvider | undefined;
 
     constructor(blockchainProvider: BlockchainProvider | undefined = undefined) {
@@ -158,9 +159,9 @@ class CardanoWallet implements Wallet, BridgeSupport {
         }
 
         let wallet = (window as any).cardano[walletName];
-        // if (!wallet) {
-        //     throw WalletErrorMessage.NOT_INSTALLED_WALLET(walletName);
-        // }
+        if (!wallet) {
+            throw WalletErrorMessage.NOT_INSTALLED_WALLET(walletName);
+        }
 
         // if (EXPERIMENTAL_WALLETS.includes(walletName)) {
         //     console.warn(`${walletName} may be unstable. Use it carefully.`);
@@ -382,17 +383,19 @@ class CardanoWallet implements Wallet, BridgeSupport {
         networkId = 0
     ) {
         // Init transaction builder
-        const protocolParameters = await this.blockchainProvider?.getProtocolParameters(networkId);
+        if (!this.protocolParameters) {
+            this.protocolParameters = await this.blockchainProvider?.getProtocolParameters(networkId);
+        }
         // console.log("protocolParameters:", protocolParameters);
-        const txBuilder = CardanoWallet._initTxBuilder(protocolParameters);
+        const txBuilder = CardanoWallet._initTxBuilder(this.protocolParameters);
 
         // const coinSelection = new CoinSelection();
 
         CoinSelection.setProtocolParameters(
-            protocolParameters.min_utxo.toString(),
-            protocolParameters.min_fee_a.toString(),
-            protocolParameters.min_fee_b.toString(),
-            protocolParameters.max_tx_size.toString()
+            this.protocolParameters.min_utxo.toString(),
+            this.protocolParameters.min_fee_a.toString(),
+            this.protocolParameters.min_fee_b.toString(),
+            this.protocolParameters.max_tx_size.toString()
         );
 
         const datums = Loader.CSL.PlutusList.new();
@@ -414,7 +417,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 outputValue.set_multiasset(multiAsset);
                 let minAda = Loader.CSL.min_ada_required(
                     outputValue,
-                    Loader.CSL.BigNum.from_str(protocolParameters.coins_per_utxo_word).checked_add(Loader.CSL.BigNum.from_str("1000000"))
+                    Loader.CSL.BigNum.from_str(this.protocolParameters.coins_per_utxo_word).checked_add(Loader.CSL.BigNum.from_str("1000000"))
                 );
                 if (Loader.CSL.BigNum.from_str(lovelace).compare(minAda) < 0) {
                     outputValue.set_coin(minAda);
@@ -596,11 +599,16 @@ class CardanoWallet implements Wallet, BridgeSupport {
     ) {
         const networkId = await this.getNetworkId();
 
+        this.protocolParameters = await this.blockchainProvider?.getProtocolParameters(networkId);
+
+        const usedAddress = (await this.getUsedAddresses())[0];
+        const balance = (await this.getBalance()).filter(b => b.unit === asset.token)[0];
+
         const payer = {
-            address: (await this.getUsedAddresses())[0],
+            address: usedAddress,
             cborUtxos: await this._getCborUtxos(),
         };
-        const recipient = {
+        const recipients = [{
             address:
                 networkId
                 ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].address
@@ -610,16 +618,42 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 unit: asset.token,
                 quantity: asset.quantity
             }] : undefined
-            // assets: {
-            //     "fda1b6b487bee2e7f64ecf24d24b1224342484c0195ee1b7b943db50.tBLUES": 1000000
-            // }
-        };
+        }];
+        if (asset.token !== "lovelace" && balance) {
+            // console.log(balance);
+            const changeBalance = Loader.CSL.BigNum.from_str(balance.quantity).checked_sub(Loader.CSL.BigNum.from_str(asset.quantity));
+            if (changeBalance.compare(Loader.CSL.BigNum.from_str("0")) > 0) {
+                recipients.push({
+                    address: usedAddress,
+                    amount: undefined,
+                    assets: [{
+                        unit: asset.token,
+                        quantity: changeBalance.to_str()
+                    }]
+                });
+            }
+        }
+        // console.log(recipients);
         const metadata =
             networkId
             ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].metadata(to.address)
             : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].metadata(to.address);
-
-        const buildedTx = await this.buildTx(payer, [recipient], metadata, options.ttl, networkId);
+        
+        // TODO: in future rework it
+        let buildedTx;
+        for (let i = 0; i < 25 && buildedTx === undefined; ++i) {
+            // console.log(i);
+            try {
+                buildedTx = await this.buildTx(payer, recipients, metadata, options.ttl, networkId);
+            } catch(err) {
+                if (err !== "Not enough ADA leftover to include non-ADA assets in a change address") {
+                    throw err;
+                }
+            }
+        }
+        if (buildedTx === undefined) {
+            throw "Not enough ADA leftover to include non-ADA assets in a change address";
+        }
 
         const res: BridgeResponse = {
             from: {
