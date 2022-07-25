@@ -5,14 +5,14 @@ import Loader from "../../common/Loader";
 import CoinSelection from "../../common/cardano/CoinSelection";
 import BlockchainProvider from "../../blockchain/interfaces/BlockchainProvider";
 import BridgeProvider from "../../bridge/BridgeProvider";
-import { BridgeResponse, BridgeSupport, Transaction } from "../interfaces/BridgeSupport";
+import { BridgeResponse, BridgeSupport } from "../interfaces/BridgeSupport";
 
-import { Asset } from "../../common/types";
+import { Asset, Transaction } from "../../common/types";
 import { CardanoAsset } from "./types";
 
 import { Buffer } from "buffer";
-import { AsciiToHex, BufferToHex, HexToBuffer } from "../util";
-import { BridgeName, ChainName } from "../../bridge/types";
+import { AsciiToHex, BufferToHex, HexToBuffer } from "../../common/util";
+import { BridgeName, ChainName } from "../../bridge/config";
 import { bridgeConfigs } from "../../bridge/config";
 
 import { CardanoWalletName } from "./config";
@@ -683,7 +683,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             );
             res.from.tx = {
                 hash: fromTxHash,
-                wait: async (blockchainProvider = this.blockchainProvider) => {
+                wait: async (blockchainProvider = this.blockchainProvider, confirmations = 0) => {
                     return new Promise<string>(async (resolve, reject) => {
                         if (blockchainProvider) {
                             resolve(await blockchainProvider.getTxBlockHash(fromTxHash, networkId));
@@ -699,7 +699,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
                     const toTxHash: string = await bp.getBridgeTxFor(fromTxHash, networkId);
                     resolve ({
                         hash: toTxHash,
-                        wait: async (blockchainProvider: any) => {
+                        wait: async (blockchainProvider: any, confirmations = 0) => {
                             return new Promise<string>(async (resolve, reject) => {
                                 if (blockchainProvider) {
                                     resolve((await blockchainProvider.waitForTransaction(toTxHash)).blockHash);
