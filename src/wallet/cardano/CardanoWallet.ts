@@ -262,10 +262,11 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     async getUtxos() {
         const hexUtxos = await this._getCborUtxos();
+        // console.log();
         const Utxos = hexUtxos.map(
             utxo => Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxo))
         );
-        const UTXOS: {txHash: string, txId: number, amount: any}[] = [];
+        const UTXOS: {txHash: string, txId: number, address: string, amount: any}[] = [];
         for (const utxo of Utxos) {
             let value = utxo.output().amount();
             let assets = CardanoWallet._valueToAssets(value);
@@ -275,6 +276,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
                     utxo.input().transaction_id().to_bytes()
                 ).toString('hex'),
                 txId: utxo.input().index(),
+                address: utxo.output().address().to_bech32(),
                 amount: assets
             });
         }
@@ -450,7 +452,8 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         for (let i = 0; i < selection.input.length; ++i) {
             txBuilder.add_input(
-                Loader.CSL.Address.from_bech32(payer.address),
+                // Loader.CSL.Address.from_bech32(payer.address),
+                selection.input[i].output().address(),
                 selection.input[i].input(),
                 selection.input[i].output().amount()
             );
