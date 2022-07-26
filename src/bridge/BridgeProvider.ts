@@ -1,6 +1,8 @@
+import { Signer } from "ethers";
 import { BridgeName } from "../bridge/config";
 
 import { Asset } from "../common/types";
+import { BridgeResponse } from "./types";
 
 
 interface BridgeProvider {
@@ -12,9 +14,8 @@ interface BridgeProvider {
         asset: Asset,
         from: { chain: string, address: string },
         to: { chain: string, address: string },
-        signer: any,
-        provider: any
-    ): Promise<any>;
+        signer: Signer
+    ): Promise<BridgeResponse>;
 }
 
 export default BridgeProvider;

@@ -5,15 +5,14 @@ import Loader from "../../common/Loader";
 import CoinSelection from "../../common/cardano/CoinSelection";
 import BlockchainProvider from "../../blockchain/interfaces/BlockchainProvider";
 import BridgeProvider from "../../bridge/BridgeProvider";
-import { BridgeResponse, BridgeSupport } from "../interfaces/BridgeSupport";
+import { BridgeSupport } from "../interfaces/BridgeSupport";
 
 import { Asset, Transaction } from "../../common/types";
 import { CardanoAsset } from "./types";
 
 import { Buffer } from "buffer";
 import { AsciiToHex, BufferToHex, HexToBuffer } from "../../common/util";
-import { BridgeName, ChainName } from "../../bridge/config";
-import { bridgeConfigs } from "../../bridge/config";
+import { BridgeResponse, BridgeName, ChainName, bridgeConfigs } from "../../bridge";
 
 import { CardanoWalletName } from "./config";
 

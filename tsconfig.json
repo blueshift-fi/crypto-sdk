@@ -1,8 +1,6 @@
 {
   "compilerOptions": {
     "declaration": true,
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
     "strictNullChecks": true,
     "target": "es5", 
     "outDir": "lib",

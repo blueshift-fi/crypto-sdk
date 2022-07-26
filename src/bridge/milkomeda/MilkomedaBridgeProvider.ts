@@ -1,16 +1,14 @@
 import { Buffer } from "buffer";
-import { ethers } from "ethers";
+import { ethers, Signer } from "ethers";
 
 import BridgeProvider from "../BridgeProvider";
 
 import { awaitTimeout, BufferToHex } from "../../common/util";
 
 import { bridgeConfigs, BridgeName, ChainName } from "../config";
-import MilkomedaBridgeAbi from './MilkomedaBridgeAbi.json';
 
-import IERC20Abi from '../../common/ethereum/IERC20Abi.json';
 import { Asset, Transaction } from "../../common/types";
-
+import { BridgeResponse } from "../types";
 
 const ETH_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ONE = ethers.BigNumber.from(10).pow(18);
@@ -18,6 +16,9 @@ const ONE = ethers.BigNumber.from(10).pow(18);
 const REQUEST_LIMIT = 100;
 const TIMEOUT_LIMIT = 30;
 const ERROR = () => new Error("Milkomeda bridge provider error");
+
+const MilkomedaBridgeAbi = require("./MilkomedaBridgeAbi.json");
+const IERC20Abi = require("../../common/ethereum/IERC20Abi.json");
 
 
 class MilkomedaBridgeProvider implements BridgeProvider {
@@ -95,33 +96,33 @@ class MilkomedaBridgeProvider implements BridgeProvider {
         asset: Asset,
         from: { chain: ChainName, address: string },
         to: { chain: ChainName, address: string },
-        signer: any,
-        provider: any
-    ): Promise<any> {
+        signer: Signer
+    ): Promise<BridgeResponse> {
         const bridgeConfig = bridgeConfigs[BridgeName.Milkomeda][from.chain][to.chain];
 
         if (!bridgeConfig) {
             throw new Error("Bridge config is undefiend");
         }
 
-        const bridgeContract = new ethers.Contract(bridgeConfig.address, MilkomedaBridgeAbi, provider);
+        const bridgeContract = new ethers.Contract(bridgeConfig.address, MilkomedaBridgeAbi, signer);
 
         const amount = ethers.BigNumber.from(asset.quantity);
 
         if (asset.token !== ETH_ADDRESS) {
-            const tokenContract = new ethers.Contract(asset.token, IERC20Abi, provider);
+            const tokenContract = new ethers.Contract(asset.token, IERC20Abi, signer);
             const allowanceAmount: ethers.BigNumber = await tokenContract.allowance(await signer.getAddress(), bridgeConfig.address);
 
             if (amount.gt(allowanceAmount)) {
-                const approveAmount = amount.sub(allowanceAmount);
-                const aproveTx = await tokenContract.connect(signer).approve(bridgeConfig.address, approveAmount);
+                const aproveTx = await tokenContract.connect(signer).approve(bridgeConfig.address, amount);
                 await aproveTx.wait();
             }
         }
 
+        const assetId = await bridgeContract.callStatic.findAssetIdByAddress(asset.token);
+
         const fromTx = await bridgeContract.connect(signer).submitUnwrappingRequest(
             {
-                assetId: await bridgeContract.findAssetIdByAddress(asset.token),
+                assetId: assetId,
                 from: await signer.getAddress(),
                 to: "0x" + BufferToHex(Buffer.from(to.address)),
                 amount: amount
@@ -142,7 +143,11 @@ class MilkomedaBridgeProvider implements BridgeProvider {
                             resolve((await fromTx.wait()).blockHash);
                         })
                     }
-                } as Transaction
+                } as Transaction,
+                fee: {
+                    token: "0x0000000000000000000000000000000000000000",
+                    quantity: "1" + "0".repeat(18)
+                }
             },
             to: {
                 chain: to.chain,
@@ -153,14 +158,19 @@ class MilkomedaBridgeProvider implements BridgeProvider {
                         wait: async (blockchainProvider: any, confirmations = 0) => {
                             return new Promise<string>(async (resolve, reject) => {
                                 if (blockchainProvider) {
-                                    resolve((await blockchainProvider.getTxBlockHash(toTxHash, targetNetworkId)).blockHash);
+                                    resolve(await blockchainProvider.getTxBlockHash(toTxHash, targetNetworkId));
                                 }
                                 reject("BlockchainProvider is undefiend");
                             })
                         }
                     });
-                })
-            }
+                }),
+                fee: {
+                    token: "0x0000000000000000000000000000000000000000",
+                    quantity: "1" + "0".repeat(18)
+                }
+            },
+            by: BridgeName.Milkomeda
         };
     }
 }
