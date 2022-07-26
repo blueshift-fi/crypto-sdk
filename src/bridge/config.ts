@@ -1,5 +1,16 @@
-import { BridgeName, ChainName, BridgeConfig } from "./types";
+import { BridgeConfig } from "./types";
 
+export enum BridgeName {
+    Milkomeda = "Milkomeda"
+}
+
+export enum ChainName {
+    Cardano = "Cardano",
+    CardanoTestnet = "Cardano Testnet",
+
+    Milkomeda = "Milkomeda",
+    MilkomedaDevnet = "Milkomeda Devnet"
+}
 
 export const bridgeConfigs = {
     [BridgeName.Milkomeda]: {
