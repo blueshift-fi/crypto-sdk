@@ -42,7 +42,7 @@ class MilkomedaBridgeProvider implements BridgeProvider {
     }) {
         const networkEndpoint = networkId == 0 ?
             'https://ada-bridge-devnet-cardano-evm.c1.milkomeda.com/api/v1':
-            'https://ada-bridge-mainnet-cardano-evm.c1.milkomeda.com/api/v1';
+            'https://ada-bridge-mainnet-cardano-evm-us.c1.milkomeda.com/api/v1';
 
         try {
             return await (await fetch(`${networkEndpoint}${endpoint}`, {
