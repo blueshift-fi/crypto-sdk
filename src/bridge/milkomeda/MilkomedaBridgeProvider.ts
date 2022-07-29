@@ -17,8 +17,8 @@ const REQUEST_LIMIT = 100;
 const TIMEOUT_LIMIT = 30;
 const ERROR = () => new Error("Milkomeda bridge provider error");
 
-const MilkomedaBridgeAbi = require("./MilkomedaBridgeAbi.json");
-const IERC20Abi = require("../../common/ethereum/IERC20Abi.json");
+import MilkomedaBridgeAbi = require("./MilkomedaBridgeAbi.json");
+import IERC20Abi = require("../../common/ethereum/IERC20Abi.json");
 
 
 class MilkomedaBridgeProvider implements BridgeProvider {

@@ -6,6 +6,7 @@
     "outDir": "lib",
     "module": "commonjs",
     "moduleResolution": "node",
+    "resolveJsonModule": true,
     "lib": [
       "es2015",
       "es2020",
@@ -21,8 +22,7 @@
       "@blockchain/*": ["./src/blockchain/*"],
       "@bridge/*": ["./src/bridge/*"]
     },
-    "allowJs": true,
-    "rootDir": "src"
+    "allowJs": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "lib"]
