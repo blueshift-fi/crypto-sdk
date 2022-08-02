@@ -1,21 +1,6 @@
-import BridgeProvider from "../../bridge/BridgeProvider";
-import { BridgeName, ChainName } from "../../bridge/config";
+import { BridgeProvider, BridgeName, ChainName, BridgeResponse } from "../../bridge";
 import { Asset, Transaction } from "../../common/types";
 
-
-export type BridgeResponse = {
-    from: {
-        chain: ChainName,
-        tx?: Transaction,
-        fee: Asset
-    },
-    to: {
-        chain: ChainName,
-        tx?: Promise<Transaction>,
-        fee: Asset
-    },
-    by: BridgeName
-}
 
 export interface BridgeSupport {
     setBridgeProvider(bridgeProvider: BridgeProvider): void;

@@ -88,8 +88,6 @@ class CardanoWallet implements Wallet, BridgeSupport {
         switch(this.walletName) {
             case CardanoWalletName.YOROI:
                 const cborAddresses = await this._getCborUsedAddresses();
-                console.log(cborAddresses);
-                console.log(cborAddresses[0]);
                 networkId = Loader.CSL.Address.from_bytes(
                     HexToBuffer(cborAddresses[0])
                 ).network_id() as number;

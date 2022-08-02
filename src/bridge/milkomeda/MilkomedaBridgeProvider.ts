@@ -17,8 +17,8 @@ const REQUEST_LIMIT = 100;
 const TIMEOUT_LIMIT = 30;
 const ERROR = () => new Error("Milkomeda bridge provider error");
 
-const MilkomedaBridgeAbi = require("./MilkomedaBridgeAbi.json");
-const IERC20Abi = require("../../common/ethereum/IERC20Abi.json");
+import MilkomedaBridgeAbi = require("./MilkomedaBridgeAbi.json");
+import IERC20Abi = require("../../common/ethereum/IERC20Abi.json");
 
 
 class MilkomedaBridgeProvider implements BridgeProvider {
@@ -42,7 +42,7 @@ class MilkomedaBridgeProvider implements BridgeProvider {
     }) {
         const networkEndpoint = networkId == 0 ?
             'https://ada-bridge-devnet-cardano-evm.c1.milkomeda.com/api/v1':
-            'https://ada-bridge-mainnet-cardano-evm.c1.milkomeda.com/api/v1';
+            'https://ada-bridge-mainnet-cardano-evm-us.c1.milkomeda.com/api/v1';
 
         try {
             return await (await fetch(`${networkEndpoint}${endpoint}`, {
