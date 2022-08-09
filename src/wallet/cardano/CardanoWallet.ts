@@ -388,13 +388,14 @@ class CardanoWallet implements Wallet, BridgeSupport {
         // console.log("protocolParameters:", protocolParameters);
         const txBuilder = CardanoWallet._initTxBuilder(this.protocolParameters);
 
-        // const coinSelection = new CoinSelection();
+        const coinSelection = new CoinSelection();
 
-        CoinSelection.setProtocolParameters(
+        coinSelection.setProtocolParameters(
             this.protocolParameters.min_utxo.toString(),
             this.protocolParameters.min_fee_a.toString(),
             this.protocolParameters.min_fee_b.toString(),
-            this.protocolParameters.max_tx_size.toString()
+            this.protocolParameters.max_tx_size.toString(),
+            this.protocolParameters.coins_per_utxo_word.toString()
         );
 
         const datums = Loader.CSL.PlutusList.new();
@@ -441,16 +442,15 @@ class CardanoWallet implements Wallet, BridgeSupport {
             Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxos))
         );
 
-        const selection = await CoinSelection.randomImprove(
+        const selection = await coinSelection.select(
             payerUtxos,
             outputs,
-            20
+            30
         );
         // console.log(selection);
 
         for (let i = 0; i < selection.input.length; ++i) {
             txBuilder.add_input(
-                // Loader.CSL.Address.from_bech32(payer.address),
                 selection.input[i].output().address(),
                 selection.input[i].input(),
                 selection.input[i].output().amount()
@@ -619,47 +619,18 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 quantity: asset.quantity
             }] : undefined
         }];
-        if (asset.token !== "lovelace" && balance) {
-            // console.log(balance);
-            const changeBalance = Loader.CSL.BigNum.from_str(balance.quantity).checked_sub(Loader.CSL.BigNum.from_str(asset.quantity));
-            if (changeBalance.compare(Loader.CSL.BigNum.from_str("0")) > 0) {
-                recipients.push({
-                    address: usedAddress,
-                    amount: undefined,
-                    assets: [{
-                        unit: asset.token,
-                        quantity: changeBalance.to_str()
-                    }]
-                });
-            }
-        }
-        // console.log(recipients);
         const metadata =
             networkId
             ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].metadata(to.address)
             : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].metadata(to.address);
         
-        // TODO: in future rework it
-        let buildedTx;
-        for (let i = 0; i < 25 && buildedTx === undefined; ++i) {
-            // console.log(i);
-            try {
-                buildedTx = await this.buildTx(payer, recipients, metadata, options.ttl, networkId);
-            } catch(err) {
-                if (err !== "Not enough ADA leftover to include non-ADA assets in a change address") {
-                    throw err;
-                }
-            }
-        }
-        if (buildedTx === undefined) {
-            throw "Not enough ADA leftover to include non-ADA assets in a change address";
-        }
+        let buildedTx = await this.buildTx(payer, recipients, metadata, options.ttl, networkId);
 
         const res: BridgeResponse = {
             from: {
                 chain: networkId ? ChainName.Cardano : ChainName.CardanoTestnet,
                 fee: {
-                    token: networkId ? "ADA" : "TADA",
+                    token: "lovelace",
                     quantity: buildedTx.fee as string,
                     decimals: 6
                 }
