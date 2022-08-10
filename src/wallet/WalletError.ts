@@ -1,4 +1,6 @@
-export enum ErrorCode {
+
+
+export enum WalletErrorCode {
     // shell
     UNSUPPORTED_WALLET,
     NOT_INSTALLED_WALLET,
@@ -20,9 +22,9 @@ export enum ErrorCode {
 }
 
 export class WalletError extends Error {
-    private code: ErrorCode;
+    private code: WalletErrorCode;
 
-    constructor(code: ErrorCode, message: string) {
+    constructor(code: WalletErrorCode, message: string) {
         super(message);
         this.name = "Wallet error";
         this.code = code;
@@ -31,31 +33,29 @@ export class WalletError extends Error {
 
 export const WalletErrors = {
     // shell
-    [ErrorCode.UNSUPPORTED_WALLET]:
-        (name: string) => new WalletError(ErrorCode.UNSUPPORTED_WALLET, name + " is unsupported"),
-    [ErrorCode.NOT_INSTALLED_WALLET]:
-        (name: string) => new WalletError(ErrorCode.NOT_INSTALLED_WALLET, name + " isn't installed"),
-    [ErrorCode.NOT_CONNECTED_WALLET]:
-        new WalletError(ErrorCode.NOT_CONNECTED_WALLET, "wallet isn't connected"),
-    [ErrorCode.UNSUPPORTED_METHOD]:
-        (name: string, method: string) => new WalletError(ErrorCode.UNSUPPORTED_METHOD, name + " doesn't support " + method),
+    [WalletErrorCode.UNSUPPORTED_WALLET]:
+        (name: string) => new WalletError(WalletErrorCode.UNSUPPORTED_WALLET, name + " is unsupported"),
+    [WalletErrorCode.NOT_INSTALLED_WALLET]:
+        (name: string) => new WalletError(WalletErrorCode.NOT_INSTALLED_WALLET, name + " isn't installed"),
+    [WalletErrorCode.NOT_CONNECTED_WALLET]:
+        new WalletError(WalletErrorCode.NOT_CONNECTED_WALLET, "wallet isn't connected"),
+    [WalletErrorCode.UNSUPPORTED_METHOD]:
+        (name: string, method: string) => new WalletError(WalletErrorCode.UNSUPPORTED_METHOD, name + " doesn't support " + method),
 
     // API call
-    [ErrorCode.API_CALL_FAILED]:
-        (cause: string) => new WalletError(ErrorCode.API_CALL_FAILED, cause),
+    [WalletErrorCode.API_CALL_FAILED]:
+        (cause: string) => new WalletError(WalletErrorCode.API_CALL_FAILED, cause),
 
     // user
     // Cardano
-    [ErrorCode.COLLATERAL_IS_MISSING]:
-        new WalletError(ErrorCode.COLLATERAL_IS_MISSING, "collateral of wallet is missing"),
+    [WalletErrorCode.COLLATERAL_IS_MISSING]:
+        new WalletError(WalletErrorCode.COLLATERAL_IS_MISSING, "collateral of wallet is missing"),
 
     // transaction
-    [ErrorCode.TRANSACTION_BUILDING_FAILED]:
-        (cause: string) => new WalletError(ErrorCode.TRANSACTION_BUILDING_FAILED, cause),
+    [WalletErrorCode.TRANSACTION_BUILDING_FAILED]:
+        (cause: string) => new WalletError(WalletErrorCode.TRANSACTION_BUILDING_FAILED, cause),
     
     // other
-    [ErrorCode.UNKNOWN]:
-        (cause: string) => new WalletError(ErrorCode.UNKNOWN, cause),
-    
-    
+    [WalletErrorCode.UNKNOWN]:
+        (cause: string) => new WalletError(WalletErrorCode.UNKNOWN, cause),
 }
