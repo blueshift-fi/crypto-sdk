@@ -1,5 +1,5 @@
 import Wallet from "../Wallet";
-import WalletErrorMessage from "../WalletErrorMessage";
+import { WalletErrorCode, WalletErrors } from "../WalletError";
 
 import Loader from "../../common/Loader";
 import CoinSelection from "../../common/cardano/CoinSelection";
@@ -21,17 +21,17 @@ const SUPPORTED_WALLETS = [
     CardanoWalletName.NAMI,
     CardanoWalletName.FLINT,
     CardanoWalletName.CARDWALLET
-]
+];
 
 const EXPERIMENTAL_WALLETS = [
     CardanoWalletName.ETERNL,
     CardanoWalletName.TYPHON,
     CardanoWalletName.YOROI
-]
+];
 
 const UNSUPPORTED_WALLETS = [
     CardanoWalletName.GEROWALLET
-]
+];
 
 const LANGUAGE_VIEWS = "a141005901d59f1a000302590001011a00060bc719026d00011a000249f01903e800011a000249f018201a0025cea81971f70419744d186419744d186419744d186419744d186419744d186419744d18641864186419744d18641a000249f018201a000249f018201a000249f018201a000249f01903e800011a000249f018201a000249f01903e800081a000242201a00067e2318760001011a000249f01903e800081a000249f01a0001b79818f7011a000249f0192710011a0002155e19052e011903e81a000249f01903e8011a000249f018201a000249f018201a000249f0182001011a000249f0011a000249f0041a000194af18f8011a000194af18f8011a0002377c190556011a0002bdea1901f1011a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a000242201a00067e23187600010119f04c192bd200011a000249f018201a000242201a00067e2318760001011a000242201a00067e2318760001011a0025cea81971f704001a000141bb041a000249f019138800011a000249f018201a000302590001011a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a00330da70101ff";
 
@@ -65,7 +65,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     getAvailableNames() {
         if ((window as any).cardano === undefined) {
-            console.error("Cardano API not found");
+            console.warn("Cardano API not found");
             return [];
         }
 
@@ -79,9 +79,9 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async getNetworkId() {
-        // if (!await this.isEnabled()) {
-        //     throw WalletErrorMessage.NOT_CONNECTED_WALLET(this.walletName);
-        // }
+        if (!await this.isEnabled()) {
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
+        }
 
         let networkId = -1;
 
@@ -145,9 +145,9 @@ class CardanoWallet implements Wallet, BridgeSupport {
         this.walletAuth = undefined;
         this.walletName = undefined;
 
-        // if (!SUPPORTED_WALLETS.includes(walletName)) {
-        //     throw WalletErrorMessage.UNSUPPORTED_WALLET(walletName);
-        // }
+        if (![...SUPPORTED_WALLETS, ...EXPERIMENTAL_WALLETS].map(elem => elem.toString()).includes(walletName)) {
+            throw WalletErrors[WalletErrorCode.UNSUPPORTED_WALLET](walletName)
+        }
 
         walletName = walletName.toLowerCase();
 
@@ -157,13 +157,12 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         let wallet = (window as any).cardano[walletName];
         if (!wallet) {
-            throw WalletErrorMessage.NOT_INSTALLED_WALLET(walletName);
+            throw WalletErrors[WalletErrorCode.NOT_INSTALLED_WALLET](walletName);
         }
 
-        // if (EXPERIMENTAL_WALLETS.includes(walletName)) {
-        //     console.warn(`${walletName} may be unstable. Use it carefully.`);
-        //     throw WalletErrorMessage.UNSUPPORTED_WALLET(walletName);
-        // }
+        if (EXPERIMENTAL_WALLETS.map(elem => elem.toString()).includes(walletName)) {
+            console.warn(`${walletName} may be unstable. Use it carefully.`);
+        }
 
         this.wallet = wallet;
         this.walletName = walletName as CardanoWalletName;
@@ -173,11 +172,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     /* ACCOUNT INFO */
 
-    private async _getCborUsedAddresses(): Promise<string[]> {
-        if (!await this.isEnabled()) {
-            throw WalletErrorMessage.NOT_CONNECTED_WALLET(this.name());
-        }
-        
+    private async _getCborUsedAddresses(): Promise<string[]> {        
         return await this.walletApi.getUsedAddresses({
             page: 0,
             limit: 5,
@@ -185,6 +180,10 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async getUsedAddresses() {
+        if (!await this.isEnabled()) {
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
+        }
+
         const cborAddresses = await this._getCborUsedAddresses();
         let addresses = cborAddresses.map((addr: string) => 
             Loader.CSL.BaseAddress.from_address(
@@ -201,14 +200,14 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     private async _getCborBalance() {
-        if (!await this.isEnabled()) {
-            throw WalletErrorMessage.NOT_CONNECTED_WALLET(this.name());
-        }
-
         return await this.walletApi.getBalance();
     }
 
     async getBalance(): Promise<CardanoAsset[]> {
+        if (!await this.isEnabled()) {
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
+        }
+
         const cborBalance = await this._getCborBalance();
         const value = Loader.CSL.Value.from_bytes(HexToBuffer(cborBalance));
         return CardanoWallet._valueToAssets(value);
@@ -388,13 +387,14 @@ class CardanoWallet implements Wallet, BridgeSupport {
         // console.log("protocolParameters:", protocolParameters);
         const txBuilder = CardanoWallet._initTxBuilder(this.protocolParameters);
 
-        // const coinSelection = new CoinSelection();
+        const coinSelection = new CoinSelection();
 
-        CoinSelection.setProtocolParameters(
+        coinSelection.setProtocolParameters(
             this.protocolParameters.min_utxo.toString(),
             this.protocolParameters.min_fee_a.toString(),
             this.protocolParameters.min_fee_b.toString(),
-            this.protocolParameters.max_tx_size.toString()
+            this.protocolParameters.max_tx_size.toString(),
+            this.protocolParameters.coins_per_utxo_word.toString()
         );
 
         const datums = Loader.CSL.PlutusList.new();
@@ -441,16 +441,27 @@ class CardanoWallet implements Wallet, BridgeSupport {
             Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxos))
         );
 
-        const selection = await CoinSelection.randomImprove(
-            payerUtxos,
-            outputs,
-            20
-        );
+        let selection;
+        try {
+            selection = await coinSelection.select(
+                payerUtxos,
+                outputs,
+                30
+            );
+        } catch (err) {
+            switch(err.message) {
+            case "BALANCE_EXHAUSTED":
+            case "INPUT_LIMIT_EXCEEDED":
+                throw WalletErrors[WalletErrorCode.TRANSACTION_BUILDING_FAILED](err.message);
+
+            default:
+                throw WalletErrors[WalletErrorCode.UNKNOWN](err.message);
+            }
+        }
         // console.log(selection);
 
         for (let i = 0; i < selection.input.length; ++i) {
             txBuilder.add_input(
-                // Loader.CSL.Address.from_bech32(payer.address),
                 selection.input[i].output().address(),
                 selection.input[i].input(),
                 selection.input[i].output().amount()
@@ -510,7 +521,14 @@ class CardanoWallet implements Wallet, BridgeSupport {
     
 
     async signTx(rawTx: string, partialSign = false): Promise<string> {
-        return await this.walletApi.signTx(rawTx, partialSign);
+        let signedTx: string;
+        try {
+            signedTx = await this.walletApi.signTx(rawTx, partialSign);
+        } catch (err) {
+            console.warn(err);
+            throw WalletErrors[WalletErrorCode.API_CALL_FAILED](err?.message || err?.info);
+        }
+        return signedTx;
     }
 
     async submitTx(
@@ -578,10 +596,15 @@ class CardanoWallet implements Wallet, BridgeSupport {
             aux
         );
 
-        const txHash = await this.walletApi.submitTx(
-            Buffer.from(signedTx.to_bytes(), "hex").toString("hex")
-        );
-
+        let txHash: string;
+        try {
+            txHash = await this.walletApi.submitTx(
+                Buffer.from(signedTx.to_bytes(), "hex").toString("hex")
+            );
+        } catch (err) {
+            console.warn(err);
+            throw WalletErrors[WalletErrorCode.API_CALL_FAILED](err?.message || err?.info);
+        }
         return txHash;
     }
 
@@ -619,47 +642,18 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 quantity: asset.quantity
             }] : undefined
         }];
-        if (asset.token !== "lovelace" && balance) {
-            // console.log(balance);
-            const changeBalance = Loader.CSL.BigNum.from_str(balance.quantity).checked_sub(Loader.CSL.BigNum.from_str(asset.quantity));
-            if (changeBalance.compare(Loader.CSL.BigNum.from_str("0")) > 0) {
-                recipients.push({
-                    address: usedAddress,
-                    amount: undefined,
-                    assets: [{
-                        unit: asset.token,
-                        quantity: changeBalance.to_str()
-                    }]
-                });
-            }
-        }
-        // console.log(recipients);
         const metadata =
             networkId
             ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].metadata(to.address)
             : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].metadata(to.address);
         
-        // TODO: in future rework it
-        let buildedTx;
-        for (let i = 0; i < 25 && buildedTx === undefined; ++i) {
-            // console.log(i);
-            try {
-                buildedTx = await this.buildTx(payer, recipients, metadata, options.ttl, networkId);
-            } catch(err) {
-                if (err !== "Not enough ADA leftover to include non-ADA assets in a change address") {
-                    throw err;
-                }
-            }
-        }
-        if (buildedTx === undefined) {
-            throw "Not enough ADA leftover to include non-ADA assets in a change address";
-        }
+        let buildedTx = await this.buildTx(payer, recipients, metadata, options.ttl, networkId);
 
         const res: BridgeResponse = {
             from: {
                 chain: networkId ? ChainName.Cardano : ChainName.CardanoTestnet,
                 fee: {
-                    token: networkId ? "ADA" : "TADA",
+                    token: "lovelace",
                     quantity: buildedTx.fee as string,
                     decimals: 6
                 }
@@ -720,7 +714,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     async on(eventName: string, callback: any) {
         if (!await this.isEnabled()) {
-            throw WalletErrorMessage.NOT_CONNECTED_WALLET(this.name());
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
         }
 
         let on = this.walletApi.on || this.walletApi.experimental.on;
@@ -737,7 +731,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             }
 
             if (!on) {
-                throw WalletErrorMessage.UNSUPPORTED_METHOD(this.name(), "on(eventName, callback)");
+                throw WalletErrors[WalletErrorCode.UNSUPPORTED_METHOD](this.name(), "on(eventName, callback)");
             }
 
             on(callback);
@@ -748,7 +742,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     async off(eventName: string, callback: any) {
         if (!await this.isEnabled()) {
-            throw WalletErrorMessage.NOT_CONNECTED_WALLET(this.name());
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
         }
 
         let off = this.walletApi.off || this.walletApi.experimental.off;
@@ -765,7 +759,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             }
     
             if (!off) {
-                throw WalletErrorMessage.UNSUPPORTED_METHOD(this.name(), "off(eventName, callback)");
+                throw WalletErrors[WalletErrorCode.UNSUPPORTED_METHOD](this.name(), "off(eventName, callback)");
             }
 
             off(callback);
