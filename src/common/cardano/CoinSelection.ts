@@ -6,11 +6,13 @@ import {
 import Loader from "../Loader";
 
 
-/**
- * Compile all required outputs to a flat amounts list
- * @param outputs - The set of outputs requested for payment.
- * @return The compiled set of amounts requested for payment.
- */
+// export enum SelectionMode {
+//     BRUTE_FORCE,
+//     BIGGER_FIRST,
+//     // RANDOM,
+// }
+
+
 function mergeOutputsAmounts(outputs: TransactionOutputs): Value {
     let compiledAmountList = Loader.CSL.Value.new(
         Loader.CSL.BigNum.from_str("0")
@@ -123,6 +125,10 @@ function compareMultiAssets(leftValue: Value, rightValue: Value) {
     return res;
 }
 
+// function sortByValue(elems: TransactionUnspentOutput[], etalon: Value) {
+
+// }
+
 export default class CoinSelection {
     private protocolParameters: any;
 
@@ -134,13 +140,14 @@ export default class CoinSelection {
             maxTxSize: maxTxSize,
             coinsPerUtxoWord: coinsPerUtxoWord
         };
-        console.log(this.protocolParameters);
+        // console.log(this.protocolParameters);
     }
 
     async select(
         inputs: TransactionUnspentOutput[],
         outputs: TransactionOutputs,
-        limit = 20
+        limit = 20,
+        // mode = SelectionMode.BIGGER_FIRST
     ) {
         if (!this.protocolParameters) {
             throw new Error(
@@ -171,7 +178,18 @@ export default class CoinSelection {
         let splitedOutputsAmounts = splitAmounts(mergedOutputsAmounts);
 
         splitedOutputsAmounts.slice(0, -1).forEach((output) => {
-            const remaining = [...utxoSelection.remaining];
+            let remaining: TransactionUnspentOutput[];
+
+            // switch (mode) {
+            // // case SelectionMode.BIGGER_FIRST:
+            // //     remaining = sortByValue(utxoSelection.remaining, etalon);
+            // //     break;
+
+            // case SelectionMode.BRUTE_FORCE:
+            // default:
+                remaining = [...utxoSelection.remaining];
+                // break;
+            // }
             utxoSelection.remaining = [];
 
             for (let i = 0; i < remaining.length; ++i) {
@@ -193,7 +211,7 @@ export default class CoinSelection {
 
             const comparisonMultiAssets = compareMultiAssets(output, utxoSelection.amount);
             if (comparisonMultiAssets === undefined || comparisonMultiAssets > 0) {
-                throw new Error("INPUTS_EXHAUSTED");
+                throw new Error("BALANCE_EXHAUSTED");
             }
         });
 
@@ -220,7 +238,7 @@ export default class CoinSelection {
 
             const comparisonCoins = compareCoins(output, utxoSelection.amount);
             if (comparisonCoins === undefined || comparisonCoins > 0) {
-                throw new Error("INPUTS_EXHAUSTED");
+                throw new Error("BALANCE_EXHAUSTED");
             } 
         });
 
@@ -234,7 +252,7 @@ export default class CoinSelection {
 
             if (Loader.CSL.BigNum.from_str(amountRemaining.coin().to_str()).compare(minAda) < 0) {
                 if (utxoSelection.remaining.length === 0) {
-                    throw new Error("INPUTS_EXHAUSTED");
+                    throw new Error("BALANCE_EXHAUSTED");
                 }
                 utxoSelection.selection.push(utxoSelection.remaining[0]);
                 utxoSelection.amount = utxoSelection.amount.checked_add(utxoSelection.remaining[0].output().amount());
