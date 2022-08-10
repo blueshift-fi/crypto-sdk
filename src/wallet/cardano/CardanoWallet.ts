@@ -145,8 +145,6 @@ class CardanoWallet implements Wallet, BridgeSupport {
         this.walletAuth = undefined;
         this.walletName = undefined;
 
-        console.log([...SUPPORTED_WALLETS, ...EXPERIMENTAL_WALLETS].map(elem => elem.toString()))
-
         if (![...SUPPORTED_WALLETS, ...EXPERIMENTAL_WALLETS].map(elem => elem.toString()).includes(walletName)) {
             throw WalletErrors[WalletErrorCode.UNSUPPORTED_WALLET](walletName)
         }
