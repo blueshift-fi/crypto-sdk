@@ -2,7 +2,7 @@ import Wallet from "../Wallet";
 import { WalletErrorCode, WalletErrors } from "../WalletError";
 
 import Loader from "../../common/Loader";
-import CoinSelection from "../../common/cardano/CoinSelection";
+import CoinSelection, { SelectionMode } from "../../common/cardano/CoinSelection";
 import BlockchainProvider from "../../blockchain/interfaces/BlockchainProvider";
 import BridgeProvider from "../../bridge/BridgeProvider";
 import { BridgeSupport } from "../interfaces/BridgeSupport";
@@ -446,7 +446,8 @@ class CardanoWallet implements Wallet, BridgeSupport {
             selection = await coinSelection.select(
                 payerUtxos,
                 outputs,
-                30
+                30,
+                SelectionMode.BIGGER_FIRST
             );
         } catch (err) {
             switch(err.message) {
@@ -458,7 +459,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 throw WalletErrors[WalletErrorCode.UNKNOWN](err.message);
             }
         }
-        // console.log(selection);
+        // console.log("selection:", selection);
 
         for (let i = 0; i < selection.input.length; ++i) {
             txBuilder.add_input(
