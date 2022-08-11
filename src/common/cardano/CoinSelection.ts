@@ -2,15 +2,16 @@ import {
     TransactionUnspentOutput,
     TransactionOutputs,
     Value,
+    ScriptHash, AssetName
 } from "@emurgo/cardano-serialization-lib-browser/cardano_serialization_lib";
 import Loader from "../Loader";
 
 
-// export enum SelectionMode {
-//     BRUTE_FORCE,
-//     BIGGER_FIRST,
-//     // RANDOM,
-// }
+export enum SelectionMode {
+    BRUTE_FORCE,
+    BIGGER_FIRST,
+    // RANDOM,
+}
 
 
 function mergeOutputsAmounts(outputs: TransactionOutputs): Value {
@@ -125,9 +126,80 @@ function compareMultiAssets(leftValue: Value, rightValue: Value) {
     return res;
 }
 
-// function sortByValue(elems: TransactionUnspentOutput[], etalon: Value) {
+function sortByCoin(elems: TransactionUnspentOutput[]) {
+    if (elems.length === 0) {
+        return [];
+    }
 
-// }
+    let res = [elems[0]];
+
+    for (let i = 1; i < elems.length; ++i) {
+        const amount = elems[i].output().amount().coin();
+
+        let j = 0;
+        for (; j < res.length; ++j) {
+            const otherAmount = res[j].output().amount().coin();
+            if (amount.compare(otherAmount) >= 0) {
+                break;
+            }
+        }
+
+        if (j < res.length) {
+            res = [...res.slice(0, j), elems[i], ...res.slice(j)];
+        } else {
+            res.push(elems[i]);
+        }
+    }
+
+    return res;
+}
+
+function getAmountOfMultiAsset(value: Value, scriptHash: ScriptHash, assetName: AssetName) {
+    const multiAsset = value.multiasset();
+
+    if (multiAsset) {
+        const assets = multiAsset.get(scriptHash);
+
+        if (assets) {
+            return assets.get(assetName);
+        }
+    }
+
+    return undefined;
+}
+
+function sortByMultiAsset(elems: TransactionUnspentOutput[], scriptHash: ScriptHash, assetName: AssetName) {
+    if (elems.length === 0) {
+        return [];
+    }
+
+    let res = [elems[0]];
+
+    for (let i = 1; i < elems.length; ++i) {
+        const amount = getAmountOfMultiAsset(elems[i].output().amount(), scriptHash, assetName);
+
+        if (!amount) {
+            res.push(elems[i]);
+        } else {
+            let j = 0;
+            for (; j < res.length; ++j) {
+                const otherAmount = getAmountOfMultiAsset(res[j].output().amount(), scriptHash, assetName);
+
+                if (!otherAmount || amount.compare(otherAmount) >= 0) {
+                    break;
+                }
+            }
+
+            if (j < res.length) {
+                res = [...res.slice(0, j), elems[i], ...res.slice(j)];
+            } else {
+                res.push(elems[i]);
+            }
+        }
+    }
+
+    return res;
+}
 
 export default class CoinSelection {
     private protocolParameters: any;
@@ -147,7 +219,7 @@ export default class CoinSelection {
         inputs: TransactionUnspentOutput[],
         outputs: TransactionOutputs,
         limit = 20,
-        // mode = SelectionMode.BIGGER_FIRST
+        mode = SelectionMode.BIGGER_FIRST
     ) {
         if (!this.protocolParameters) {
             throw new Error(
@@ -178,18 +250,40 @@ export default class CoinSelection {
         let splitedOutputsAmounts = splitAmounts(mergedOutputsAmounts);
 
         splitedOutputsAmounts.slice(0, -1).forEach((output) => {
+            let scriptHash: ScriptHash | undefined;
+            let assetName: AssetName | undefined;
+
+            const multiAsset = output.multiasset();
+            if (multiAsset) {
+                const scriptHashes = multiAsset.keys();
+        
+                if (scriptHashes.len() === 1) {
+                    scriptHash = scriptHashes.get(0);
+
+                    const assets = multiAsset.get(scriptHash);
+                    if (assets) {
+                        const assetNames = assets.keys();
+
+                        if (assetNames.len() === 1) {
+                            assetName = assetNames.get(0);
+                        }
+                    }
+                }
+            }
+            if (!scriptHash || !assetName) {
+                throw new Error("UKNOWN_ASSET");
+            }
+
             let remaining: TransactionUnspentOutput[];
-
-            // switch (mode) {
-            // // case SelectionMode.BIGGER_FIRST:
-            // //     remaining = sortByValue(utxoSelection.remaining, etalon);
-            // //     break;
-
-            // case SelectionMode.BRUTE_FORCE:
-            // default:
+            switch (mode) {
+            case SelectionMode.BRUTE_FORCE:
                 remaining = [...utxoSelection.remaining];
-                // break;
-            // }
+                break;
+            case SelectionMode.BIGGER_FIRST:
+            default:
+                remaining = sortByMultiAsset(utxoSelection.remaining, scriptHash, assetName);
+                break;
+            }
             utxoSelection.remaining = [];
 
             for (let i = 0; i < remaining.length; ++i) {
@@ -216,7 +310,16 @@ export default class CoinSelection {
         });
 
         splitedOutputsAmounts.slice(-1).forEach((output) => {
-            const remaining = [...utxoSelection.remaining.reverse()];
+            let remaining: TransactionUnspentOutput[];
+            switch (mode) {
+            case SelectionMode.BRUTE_FORCE:
+                remaining = [...utxoSelection.remaining.reverse()];
+                break;
+            case SelectionMode.BIGGER_FIRST:
+            default:
+                remaining = sortByCoin(utxoSelection.remaining);
+                break;
+            }
             utxoSelection.remaining = [];
 
             for (let i = 0; i < remaining.length; ++i) {
