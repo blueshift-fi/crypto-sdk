@@ -374,6 +374,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             amount?: string,
             assets?: CardanoAsset[]
         }[] = [],
+        fee: any = undefined,
 
         metadata: any = undefined,
 
@@ -446,6 +447,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             selection = await coinSelection.select(
                 payerUtxos,
                 outputs,
+                fee,
                 30,
                 SelectionMode.BIGGER_FIRST
             );
@@ -648,7 +650,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].metadata(to.address)
             : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].metadata(to.address);
         
-        let buildedTx = await this.buildTx(payer, recipients, metadata, options.ttl, networkId);
+        let buildedTx = await this.buildTx(payer, recipients, "400000", metadata, options.ttl, networkId);
 
         const res: BridgeResponse = {
             from: {

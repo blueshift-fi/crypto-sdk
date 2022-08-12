@@ -218,6 +218,7 @@ export default class CoinSelection {
     async select(
         inputs: TransactionUnspentOutput[],
         outputs: TransactionOutputs,
+        fee = undefined,
         limit = 20,
         mode = SelectionMode.BIGGER_FIRST
     ) {
@@ -239,9 +240,11 @@ export default class CoinSelection {
         let mergedOutputsAmounts = mergeOutputsAmounts(outputs);
 
         let maxFee = Loader.CSL.Value.new(
-            Loader.CSL.BigNum.from_str(this.protocolParameters.minFeeA).checked_mul(
-            Loader.CSL.BigNum.from_str(this.protocolParameters.maxTxSize)).checked_add(
-            Loader.CSL.BigNum.from_str(this.protocolParameters.minFeeB))
+            fee
+            ?   Loader.CSL.BigNum.from_str(fee)
+            :   Loader.CSL.BigNum.from_str(this.protocolParameters.minFeeA).checked_mul(
+                Loader.CSL.BigNum.from_str(this.protocolParameters.maxTxSize)).checked_add(
+                Loader.CSL.BigNum.from_str(this.protocolParameters.minFeeB))
         );
 
         mergedOutputsAmounts = mergedOutputsAmounts.checked_add(maxFee);
