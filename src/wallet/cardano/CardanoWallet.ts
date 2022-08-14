@@ -650,7 +650,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
             ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].metadata(to.address)
             : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].metadata(to.address);
         
-        let buildedTx = await this.buildTx(payer, recipients, "400000", metadata, options.ttl, networkId);
+        let buildedTx = await this.buildTx(payer, recipients, "300000", metadata, options.ttl, networkId);
 
         const res: BridgeResponse = {
             from: {
