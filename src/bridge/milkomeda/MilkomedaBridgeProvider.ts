@@ -125,7 +125,7 @@ class MilkomedaBridgeProvider implements BridgeProvider {
                 assetId: assetId,
                 from: await signer.getAddress(),
                 to: "0x" + BufferToHex(Buffer.from(to.address)),
-                amount: asset.token !== ETH_ADDRESS ? amount : amount.sub(1)
+                amount: asset.token !== ETH_ADDRESS ? amount : amount.sub(ONE)
             },
             {
                 value: asset.token !== ETH_ADDRESS ? ONE.mul(4) : amount
