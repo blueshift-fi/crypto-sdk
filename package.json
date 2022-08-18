@@ -1,6 +1,6 @@
 {
   "name": "crypto-sdk",
-  "version": "0.4.15",
+  "version": "0.4.16",
   "description": "SDK for working with different blockchains",
   "license": "GPLv3",
   "main": "lib/index.js",
