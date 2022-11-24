@@ -336,7 +336,9 @@ class CardanoWallet implements Wallet, BridgeSupport {
     private static _makeMultiAsset(assets: CardanoAsset[]) {
         let AssetsMap: any = {}
         for (let asset of assets) {
-            let [policy, assetName] = asset.unit.split('.');
+            const index = asset.unit.indexOf('.');
+            const policy = asset.unit.slice(0, index);
+            const assetName = asset.unit.slice(index + 1);
             let quantity = asset.quantity;
             
             if (!Array.isArray(AssetsMap[policy])) {
