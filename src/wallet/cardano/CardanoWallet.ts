@@ -17,6 +17,9 @@ import { BridgeResponse, BridgeName, ChainName, bridgeConfigs } from "../../brid
 import { CardanoWalletName } from "./config";
 
 
+const UTXO_LIMIT = 40;
+
+
 const SUPPORTED_WALLETS = [
     CardanoWalletName.NAMI,
     CardanoWalletName.FLINT,
@@ -450,7 +453,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 payerUtxos,
                 outputs,
                 fee,
-                30,
+                UTXO_LIMIT,
                 SelectionMode.BIGGER_FIRST
             );
         } catch (err) {
@@ -611,6 +614,33 @@ class CardanoWallet implements Wallet, BridgeSupport {
             throw WalletErrors[WalletErrorCode.API_CALL_FAILED](err?.message || err?.info);
         }
         return txHash;
+    }
+
+    async estimateMaxBridgeAmount(token: string) {
+        const networkId = await this.getNetworkId();
+
+        if (!this.protocolParameters) {
+            this.protocolParameters = await this.blockchainProvider?.getProtocolParameters(networkId);
+        }
+        // console.log("protocolParameters:", this.protocolParameters);
+
+        const coinSelection = new CoinSelection();
+
+        coinSelection.setProtocolParameters(
+            this.protocolParameters.min_utxo.toString(),
+            this.protocolParameters.min_fee_a.toString(),
+            this.protocolParameters.min_fee_b.toString(),
+            this.protocolParameters.max_tx_size.toString(),
+            this.protocolParameters.coins_per_utxo_word.toString()
+        );
+
+        const utxos = await this._getCborUtxos();
+        
+        return coinSelection.findPossibleMax(
+            token,
+            utxos.map((utxo: string) => Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxo))),
+            UTXO_LIMIT
+        );
     }
 
     async bridge(
