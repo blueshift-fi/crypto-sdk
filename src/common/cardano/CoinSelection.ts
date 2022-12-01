@@ -1,10 +1,11 @@
 import {
     TransactionUnspentOutput,
     TransactionOutputs,
-    Value,
+    Value, BigNum,
     ScriptHash, AssetName
 } from "@emurgo/cardano-serialization-lib-browser/cardano_serialization_lib";
 import Loader from "../Loader";
+import { AsciiToHex, HexToBuffer } from "../util";
 
 
 export enum SelectionMode {
@@ -215,11 +216,69 @@ export default class CoinSelection {
         // console.log(this.protocolParameters);
     }
 
+    async findPossibleMax(
+        unit: string,
+        inputs: TransactionUnspentOutput[],
+        limit = 30
+    ) {
+        if (!this.protocolParameters) {
+            throw new Error(
+                "Protocol parameters not set. Use setProtocolParameters()."
+            );
+        }
+  
+        await Loader.load();
+
+        const selection: TransactionUnspentOutput[] = [];
+        let amount: BigNum = Loader.CSL.BigNum.from_str("0");
+
+        if (unit !== "lovelace") {
+            const index: number = unit.indexOf('.');
+            const scriptHash: ScriptHash = Loader.CSL.ScriptHash.from_bytes(HexToBuffer(unit.slice(0, index)));
+            const assetName: AssetName = Loader.CSL.AssetName.new(HexToBuffer(AsciiToHex(unit.slice(index + 1))));
+
+            const sortedInputs = sortByMultiAsset(inputs, scriptHash, assetName);
+
+            for (let input of sortedInputs) {
+                const addAmount = getAmountOfMultiAsset(input.output().amount(), scriptHash, assetName);
+
+                if (addAmount === undefined) {
+                    break;
+                }
+
+                amount = amount.checked_add(addAmount);
+                selection.push(input);
+
+                if (selection.length >= limit) {
+                    break;
+                }
+            }
+        } else {
+            const sortedInputs = sortByCoin(inputs);
+
+            for (let input of sortedInputs) {
+                const addAmount = input.output().amount().coin();
+
+                amount = amount.checked_add(addAmount);
+                selection.push(input);
+
+                if (selection.length >= limit) {
+                    break;
+                }
+            }
+        }
+
+        return {
+            amount: amount.to_str(),
+            selection: selection
+        };
+    }
+
     async select(
         inputs: TransactionUnspentOutput[],
         outputs: TransactionOutputs,
         fee = undefined,
-        limit = 20,
+        limit = 30,
         mode = SelectionMode.BIGGER_FIRST
     ) {
         if (!this.protocolParameters) {
