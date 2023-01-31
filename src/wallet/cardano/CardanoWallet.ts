@@ -11,7 +11,7 @@ import { Asset, Transaction } from "../../common/types";
 import { CardanoAsset } from "./types";
 
 import { Buffer } from "buffer";
-import { AsciiToHex, BufferToHex, HexToBuffer } from "../../common/util";
+import { AsciiToHex, BufferToAscii, BufferToHex, HexToAscii, HexToBuffer } from "../../common/util";
 import { BridgeResponse, BridgeName, ChainName, bridgeConfigs } from "../../bridge";
 
 import { CardanoWalletName } from "./config";
@@ -23,17 +23,18 @@ const UTXO_LIMIT = 40;
 const SUPPORTED_WALLETS = [
     CardanoWalletName.NAMI,
     CardanoWalletName.FLINT,
-    CardanoWalletName.CARDWALLET
+    CardanoWalletName.CARDWALLET,
 ];
 
 const EXPERIMENTAL_WALLETS = [
     CardanoWalletName.ETERNL,
     CardanoWalletName.TYPHON,
-    CardanoWalletName.YOROI
+    CardanoWalletName.YOROI,
+    CardanoWalletName.NUFI,
 ];
 
 const UNSUPPORTED_WALLETS = [
-    CardanoWalletName.GEROWALLET
+    CardanoWalletName.GEROWALLET,
 ];
 
 const LANGUAGE_VIEWS = "a141005901d59f1a000302590001011a00060bc719026d00011a000249f01903e800011a000249f018201a0025cea81971f70419744d186419744d186419744d186419744d186419744d186419744d18641864186419744d18641a000249f018201a000249f018201a000249f018201a000249f01903e800011a000249f018201a000249f01903e800081a000242201a00067e2318760001011a000249f01903e800081a000249f01a0001b79818f7011a000249f0192710011a0002155e19052e011903e81a000249f01903e8011a000249f018201a000249f018201a000249f0182001011a000249f0011a000249f0041a000194af18f8011a000194af18f8011a0002377c190556011a0002bdea1901f1011a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a000242201a00067e23187600010119f04c192bd200011a000249f018201a000242201a00067e2318760001011a000242201a00067e2318760001011a0025cea81971f704001a000141bb041a000249f019138800011a000249f018201a000302590001011a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a000249f018201a00330da70101ff";
@@ -256,7 +257,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
         return assets;
     }
 
-    private async _getCborUtxos(): Promise<string[]> {
+    async _getCborUtxos(): Promise<string[]> {
         return await this.walletApi.getUtxos();
     }
 
@@ -281,6 +282,50 @@ class CardanoWallet implements Wallet, BridgeSupport {
             });
         }
         return UTXOS;
+    }
+
+    toUtxo(hexUtxos: any) {
+        const Utxos = hexUtxos.map(
+            utxo => Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxo))
+        );
+        const UTXOS: {txHash: string, txId: number, address: string, amount: any}[] = [];
+        for (const utxo of Utxos) {
+            let value = utxo.output().amount();
+            let assets = CardanoWallet._valueToAssets(value);
+
+            UTXOS.push({
+                txHash: HexToBuffer(
+                    utxo.input().transaction_id().to_bytes()
+                ).toString('hex'),
+                txId: utxo.input().index(),
+                address: utxo.output().address().to_bech32(),
+                amount: assets
+            });
+        }
+        return UTXOS;
+    }
+
+    toCborUtxo(utxo: any) {
+        let val = Loader.CSL.Value.new(Loader.CSL.BigNum.from_str(utxo.amount[0]["quantity"]));
+        let assets = utxo.amount.slice(1);
+        if (assets.length > 0) {
+            assets = assets.map(asset => {
+                let policy = asset.unit.substring(0, 56);
+                let name = asset.unit.substring(56);
+                name = HexToAscii(name);
+                return {
+                    unit: `${policy}.${name}`,
+                    quantity: asset.quantity
+                }
+            });
+            console.log("Ku", assets);
+            let multiAsset = CardanoWallet._makeMultiAsset(assets);
+            val.set_multiasset(multiAsset);
+        }
+        const input = Loader.CSL.TransactionInput.new(Loader.CSL.TransactionHash.from_bytes(HexToBuffer(utxo.tx_hash)), utxo.tx_index);
+        const output = Loader.CSL.TransactionOutput.new(Loader.CSL.Address.from_bech32(utxo.address), val);
+
+        return BufferToHex(Buffer.from(Loader.CSL.TransactionUnspentOutput.new(input, output).to_bytes()));
     }
 
     

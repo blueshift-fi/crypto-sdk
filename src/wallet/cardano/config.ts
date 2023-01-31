@@ -6,6 +6,7 @@ export enum CardanoWalletName {
     TYPHON = "typhon",
     ETERNL = "eternl",
     GEROWALLET = "gerowallet",
+    NUFI = "nufi",
 
     // other
     YOROI = "yoroi"
