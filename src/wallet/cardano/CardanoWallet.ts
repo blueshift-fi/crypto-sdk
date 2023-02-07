@@ -15,6 +15,7 @@ import { AsciiToHex, BufferToAscii, BufferToHex, HexToAscii, HexToBuffer } from 
 import { BridgeResponse, BridgeName, ChainName, bridgeConfigs } from "../../bridge";
 
 import { CardanoWalletName } from "./config";
+import { Blockfrost } from "../../blockchain";
 
 
 const UTXO_LIMIT = 40;
@@ -258,6 +259,15 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async _getCborUtxos(): Promise<string[]> {
+        if (this.walletName === CardanoWalletName.NUFI) {
+            const utxos = await (this.blockchainProvider as Blockfrost).getAddressUtxos(
+                (await this.getUsedAddresses())[0],
+                await this.getNetworkId()
+            );
+
+            return utxos.map(utxo => this.toCborUtxo(utxo));
+        }
+
         return await this.walletApi.getUtxos();
     }
 
