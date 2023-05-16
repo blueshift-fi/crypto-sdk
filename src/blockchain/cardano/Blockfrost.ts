@@ -33,7 +33,7 @@ export class Blockfrost implements BlockchainProvider {
         method = "GET"
     }) {
         const networkEndpoint = networkId == 0 ?
-            'https://cardano-testnet.blockfrost.io/api/v0':
+            'https://cardano-preprod.blockfrost.io/api/v0':
             'https://cardano-mainnet.blockfrost.io/api/v0';
         const blockfrostApiKey = this.blockfrostApiKey[networkId];
 
