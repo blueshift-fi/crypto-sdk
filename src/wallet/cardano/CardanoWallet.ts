@@ -204,6 +204,29 @@ class CardanoWallet implements Wallet, BridgeSupport {
         return addresses;
     }
 
+    async getChangeAddress() {
+        if (!await this.isEnabled()) {
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
+        }
+
+        const cborAddress = await this.walletApi.getChangeAddress();
+        const address = Loader.CSL.BaseAddress.from_address(
+            Loader.CSL.Address.from_bytes(
+                HexToBuffer(cborAddress)
+            )
+        )?.to_address().to_bech32();
+
+        return address;
+    }
+
+    async signData(addr: string, payload: string): Promise<{ key: string; signature: string }> {
+        if (!await this.isEnabled()) {
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
+        }
+
+        return this.walletApi.signData(addr, payload);
+    }
+
     private async _getCborBalance() {
         return await this.walletApi.getBalance();
     }
