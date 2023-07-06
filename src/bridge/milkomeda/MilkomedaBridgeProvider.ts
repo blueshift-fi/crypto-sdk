@@ -42,7 +42,7 @@ class MilkomedaBridgeProvider implements BridgeProvider {
     }) {
         const networkEndpoint = networkId == 0 ?
             'https://ada-bridge-devnet-cardano-evm.c1.milkomeda.com/api/v1':
-            'https://ada-bridge-mainnet-cardano-evm-eu.c1.milkomeda.com/api/v1';
+            'https://ada-bridge-mainnet-cardano-evm-us.c1.milkomeda.com/api/v1';
 
         try {
             return await (await fetch(`${networkEndpoint}${endpoint}`, {
@@ -59,8 +59,17 @@ class MilkomedaBridgeProvider implements BridgeProvider {
     }
 
     async getBridgeTxFor(txId: string, networkId = 0): Promise<string> {
-        const toCondition = String(txId).startsWith("0x") ? "tx_id" : "mainchain_tx_id";
-        const fromCondition = String(txId).startsWith("0x") ? "mainchain_tx_id" : "transaction_id";
+        let toCondition: string;
+        let fromCondition: string;
+
+        if (String(txId).startsWith("0x")) {
+            toCondition = "tx_id";
+            fromCondition = "mainchain_tx_id";
+        } else {
+            toCondition = "mainchain_tx_id";
+            fromCondition = "transaction_id";
+        }
+
         let bridgeInfo = await this.request({
             endpoint: `/requests?${toCondition}=${txId}`,
             networkId: networkId,

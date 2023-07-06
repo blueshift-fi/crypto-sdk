@@ -60,10 +60,10 @@ const eth_sendTransaction: CustomMethod = async (
     }
 
     const cardanoAddress = await cardanoProvider.getChangeAddress();
-    const bech32Address = Address.from_bytes(Buffer.from(cardanoAddress, "hex")).to_bech32();
+    // const bech32Address = Address.from_bytes(Buffer.from(cardanoAddress, "hex")).to_bech32();
 
     if (
-      from.toUpperCase() !== (await getActorAddress(provider, bech32Address, salt)).toUpperCase()
+      from.toUpperCase() !== (await getActorAddress(provider, cardanoAddress, salt)).toUpperCase()
     ) {
       throw new ProviderRpcError("Invalid from address", JSON_RPC_ERROR_CODES.INVALID_PARAMS);
     }
@@ -78,7 +78,7 @@ const eth_sendTransaction: CustomMethod = async (
       calldata: data ?? [],
     });
 
-    const signedTransaction = await cardanoProvider.signData(bech32Address, payload.slice(2));
+    const signedTransaction = await cardanoProvider.signData(cardanoAddress, payload.slice(2));
 
     return await provider.oracleRequest({
       method: "eth_sendActorTransaction",
