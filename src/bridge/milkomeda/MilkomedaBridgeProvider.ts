@@ -137,7 +137,7 @@ class MilkomedaBridgeProvider implements BridgeProvider {
                 amount: asset.token !== ETH_ADDRESS ? amount : amount.sub(ONE)
             },
             {
-                value: asset.token !== ETH_ADDRESS ? ONE.mul(4) : amount
+                gasLimit: 1000000, value: asset.token !== ETH_ADDRESS ? ONE.mul(4) : amount
             }
         );
 
