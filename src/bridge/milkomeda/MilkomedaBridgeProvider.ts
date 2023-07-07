@@ -122,7 +122,7 @@ class MilkomedaBridgeProvider implements BridgeProvider {
             const allowanceAmount: ethers.BigNumber = await tokenContract.allowance(await signer.getAddress(), bridgeConfig.address);
 
             if (amount.gt(allowanceAmount)) {
-                const aproveTx = await tokenContract.connect(signer).approve(bridgeConfig.address, amount);
+                const aproveTx = await tokenContract.connect(signer).approve(bridgeConfig.address, amount, { gasLimit: 1000000 });
                 await aproveTx.wait();
             }
         }
