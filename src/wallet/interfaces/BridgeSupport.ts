@@ -6,6 +6,19 @@ export interface BridgeSupport {
     setBridgeProvider(bridgeProvider: BridgeProvider): void;
 
     bridge(
+        asset: Asset,
+        to: {
+            address: string,
+            chain: ChainName
+        },
+        by: BridgeName,
+        options: {
+            isDemo: boolean,
+            ttl: number
+        }
+    ): Promise<BridgeResponse>;
+
+    bridgeExtra(
         assets: {
             gas: string,
             tokens?: Asset[],

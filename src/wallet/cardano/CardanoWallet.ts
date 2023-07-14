@@ -722,6 +722,107 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async bridge(
+        asset: Asset,
+        to: {
+            address: string,
+            chain: ChainName
+        },
+        by: BridgeName,
+        options = {
+            isDemo: false,
+            ttl: 3600
+        }
+    ) {
+        const networkId = await this.getNetworkId();
+
+        this.protocolParameters = await this.blockchainProvider?.getProtocolParameters(networkId);
+
+        const usedAddress = (await this.getUsedAddresses())[0];
+        const balance = (await this.getBalance()).filter(b => b.unit === asset.token)[0];
+
+        const payer = {
+            address: usedAddress,
+            cborUtxos: await this._getCborUtxos(),
+        };
+        const recipients = [{
+            address:
+                networkId
+                ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].address
+                : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].address,
+            amount: asset.token == "lovelace" ? asset.quantity : undefined,
+            assets: asset.token != "lovelace" ? [{
+                unit: asset.token,
+                quantity: asset.quantity
+            }] : undefined
+        }];
+        const metadata =
+            networkId
+            ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].metadata(to.address)
+            : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].metadata(to.address);
+        
+        let buildedTx = await this.buildTx(payer, recipients, "300000", metadata, options.ttl, networkId);
+
+        const res: BridgeResponse = {
+            from: {
+                chain: networkId ? ChainName.Cardano : ChainName.CardanoTestnet,
+                fee: {
+                    token: "lovelace",
+                    quantity: buildedTx.fee as string,
+                    decimals: 6
+                }
+            },
+            to: {
+                chain: networkId ? ChainName.Milkomeda : ChainName.MilkomedaDevnet,
+                fee: {
+                    token: networkId ? "milkADA" : "milkTADA",
+                    quantity: "100000000000000000",
+                    decimals: 18
+                }
+            },
+            by: by
+        }
+
+        if (!options.isDemo) {
+            const witness = await this.signTx(buildedTx.rawTx);
+
+            const fromTxHash = await this.submitTx(
+                buildedTx.rawTx, [witness], metadata
+            );
+            res.from.tx = {
+                hash: fromTxHash,
+                wait: async (blockchainProvider = this.blockchainProvider, confirmations = 0) => {
+                    return new Promise<string>(async (resolve, reject) => {
+                        if (blockchainProvider) {
+                            resolve(await blockchainProvider.getTxBlockHash(fromTxHash, networkId));
+                        }
+                        reject("BlockchainProvider is undefiend");
+                    })
+                }
+            }
+            if (this.bridgeProvider) {
+                const bp = this.bridgeProvider;
+
+                res.to.tx = new Promise<Transaction> (async (resolve, reject) => {
+                    const toTxHash: string = await bp.getBridgeTxFor(fromTxHash, networkId);
+                    resolve ({
+                        hash: toTxHash,
+                        wait: async (blockchainProvider: any, confirmations = 0) => {
+                            return new Promise<string>(async (resolve, reject) => {
+                                if (blockchainProvider) {
+                                    resolve((await blockchainProvider.waitForTransaction(toTxHash)).blockHash);
+                                }
+                                reject("BlockchainProvider is undefiend");
+                            })
+                        }
+                    });
+                });
+            }
+        }
+
+        return res;
+    }
+
+    async bridgeExtra(
         assets: {
             gas: string,
             tokens?: Asset[],

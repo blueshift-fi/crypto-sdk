@@ -102,6 +102,88 @@ class MilkomedaBridgeProvider implements BridgeProvider {
     }
 
     async bridgeFromEVM(
+        asset: Asset,
+        from: { chain: ChainName, address: string },
+        to: { chain: ChainName, address: string },
+        signer: Signer
+    ): Promise<BridgeResponse> {
+        const bridgeConfig = bridgeConfigs[BridgeName.Milkomeda][from.chain][to.chain];
+
+        if (!bridgeConfig) {
+            throw new Error("Bridge config is undefiend");
+        }
+
+        const bridgeContract = new ethers.Contract(bridgeConfig.address, MilkomedaBridgeAbi, signer);
+
+        const amount = ethers.BigNumber.from(asset.quantity);
+
+        if (asset.token !== ETH_ADDRESS) {
+            const tokenContract = new ethers.Contract(asset.token, IERC20Abi, signer);
+            const allowanceAmount: ethers.BigNumber = await tokenContract.allowance(await signer.getAddress(), bridgeConfig.address);
+
+            if (amount.gt(allowanceAmount)) {
+                const aproveTx = await tokenContract.connect(signer).approve(bridgeConfig.address, amount, { gasLimit: 1000000 });
+                await aproveTx.wait();
+            }
+        }
+
+        const assetId = await bridgeContract.callStatic.findAssetIdByAddress(asset.token);
+
+        const fromTx = await bridgeContract.connect(signer).submitUnwrappingRequest(
+            {
+                assetId: assetId,
+                from: await signer.getAddress(),
+                to: "0x" + BufferToHex(Buffer.from(to.address)),
+                amount: asset.token !== ETH_ADDRESS ? amount : amount.sub(ONE)
+            },
+            {
+                gasLimit: 1000000, value: asset.token !== ETH_ADDRESS ? ONE.mul(4) : amount
+            }
+        );
+
+        const targetNetworkId = from.chain === ChainName.Milkomeda ? 1 : 0;
+        return {
+            from: {
+                chain: from.chain,
+                tx: {
+                    hash: fromTx.hash,
+                    wait: async (blockchainProvider = undefined, confirmations = 0) => {
+                        return new Promise<string>(async (resolve) => {
+                            resolve((await fromTx.wait()).blockHash);
+                        })
+                    }
+                } as Transaction,
+                fee: {
+                    token: "0x0000000000000000000000000000000000000000",
+                    quantity: "1" + "0".repeat(18)
+                }
+            },
+            to: {
+                chain: to.chain,
+                tx: new Promise<Transaction> (async (resolve) => {
+                    const toTxHash: string = await this.getBridgeTxFor(fromTx.hash, targetNetworkId);
+                    resolve ({
+                        hash: toTxHash,
+                        wait: async (blockchainProvider: any, confirmations = 0) => {
+                            return new Promise<string>(async (resolve, reject) => {
+                                if (blockchainProvider) {
+                                    resolve(await blockchainProvider.getTxBlockHash(toTxHash, targetNetworkId));
+                                }
+                                reject("BlockchainProvider is undefiend");
+                            })
+                        }
+                    });
+                }),
+                fee: {
+                    token: "0x0000000000000000000000000000000000000000",
+                    quantity: "1" + "0".repeat(18)
+                }
+            },
+            by: BridgeName.Milkomeda
+        };
+    }
+
+    async bridgeFromEVMExtra(
         assets: {
             gas: string,
             token?: Asset,

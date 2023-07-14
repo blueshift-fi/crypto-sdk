@@ -11,6 +11,13 @@ interface BridgeProvider {
 
     // Temporary method
     bridgeFromEVM(
+        asset: Asset,
+        from: { chain: string, address: string },
+        to: { chain: string, address: string },
+        signer: Signer
+    ): Promise<BridgeResponse>;
+
+    bridgeFromEVMExtra(
         assets: {
             gas: string,
             token?: Asset,
