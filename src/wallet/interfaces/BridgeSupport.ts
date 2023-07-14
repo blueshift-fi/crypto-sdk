@@ -6,7 +6,13 @@ export interface BridgeSupport {
     setBridgeProvider(bridgeProvider: BridgeProvider): void;
 
     bridge(
-        asset: Asset,
+        assets: {
+            gas: string,
+            tokens?: Asset[],
+        } | {
+            gas?: string,
+            tokens: Asset[],
+        },
         to: {
             address: string,
             chain: ChainName

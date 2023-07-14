@@ -722,7 +722,13 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async bridge(
-        asset: Asset,
+        assets: {
+            gas: string,
+            tokens?: Asset[],
+        } | {
+            gas?: string,
+            tokens: Asset[],
+        },
         to: {
             address: string,
             chain: ChainName
@@ -738,7 +744,13 @@ class CardanoWallet implements Wallet, BridgeSupport {
         this.protocolParameters = await this.blockchainProvider?.getProtocolParameters(networkId);
 
         const usedAddress = (await this.getUsedAddresses())[0];
-        const balance = (await this.getBalance()).filter(b => b.unit === asset.token)[0];
+
+        const asset: Asset = assets?.tokens ? assets.tokens[0] : {
+            token: "lovelace",
+            quantity: assets.gas
+        } as Asset;
+
+        // const balance = (await this.getBalance()).filter(b => b.unit === asset.token)[0];
 
         const payer = {
             address: usedAddress,
