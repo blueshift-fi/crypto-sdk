@@ -1,5 +1,5 @@
 import { Buffer } from "buffer";
-import { ethers, Signer } from "ethers";
+import { BigNumber, ethers, Signer } from "ethers";
 
 import BridgeProvider from "../BridgeProvider";
 
@@ -102,7 +102,13 @@ class MilkomedaBridgeProvider implements BridgeProvider {
     }
 
     async bridgeFromEVM(
-        asset: Asset,
+        assets: {
+            gas: string,
+            token?: Asset,
+        } | {
+            gas?: string,
+            token: Asset,
+        },
         from: { chain: ChainName, address: string },
         to: { chain: ChainName, address: string },
         signer: Signer
@@ -115,31 +121,72 @@ class MilkomedaBridgeProvider implements BridgeProvider {
 
         const bridgeContract = new ethers.Contract(bridgeConfig.address, MilkomedaBridgeAbi, signer);
 
-        const amount = ethers.BigNumber.from(asset.quantity);
+        const gasId = await bridgeContract.callStatic.findAssetIdByAddress(ETH_ADDRESS);
 
-        if (asset.token !== ETH_ADDRESS) {
-            const tokenContract = new ethers.Contract(asset.token, IERC20Abi, signer);
+        let gasAmount: BigNumber;
+        let assetAmount: BigNumber;
+
+        let fromTx;
+
+        if (assets?.token) {
+            assetAmount = ethers.BigNumber.from(assets.token.quantity);
+
+            const assetId = await bridgeContract.callStatic.findAssetIdByAddress(assets.token.token);
+
+            const tokenContract = new ethers.Contract(assets.token.token, IERC20Abi, signer);
             const allowanceAmount: ethers.BigNumber = await tokenContract.allowance(await signer.getAddress(), bridgeConfig.address);
 
-            if (amount.gt(allowanceAmount)) {
-                const aproveTx = await tokenContract.connect(signer).approve(bridgeConfig.address, amount, { gasLimit: 1000000 });
+            if (assetAmount.gt(allowanceAmount)) {
+                const aproveTx = await tokenContract.connect(signer).approve(bridgeConfig.address, assetAmount, { gasLimit: 1000000 });
                 await aproveTx.wait();
             }
-        }
 
-        const assetId = await bridgeContract.callStatic.findAssetIdByAddress(asset.token);
+            let value: BigNumber;
 
-        const fromTx = await bridgeContract.connect(signer).submitUnwrappingRequest(
-            {
-                assetId: assetId,
-                from: await signer.getAddress(),
-                to: "0x" + BufferToHex(Buffer.from(to.address)),
-                amount: asset.token !== ETH_ADDRESS ? amount : amount.sub(ONE)
-            },
-            {
-                gasLimit: 1000000, value: asset.token !== ETH_ADDRESS ? ONE.mul(4) : amount
+            if (assets?.gas) {
+                gasAmount = ethers.BigNumber.from(assets.gas);
+
+                if (!gasAmount.gte(ONE.mul(3))) {
+                    throw new Error("Gas must be equal or more then 3");
+                }
+
+                value = gasAmount.add(ONE);
+            } else {
+                value = ONE.mul(4);
             }
-        );
+
+            fromTx = await bridgeContract.connect(signer).submitUnwrappingRequest(
+                {
+                    assetId: assetId,
+                    from: await signer.getAddress(),
+                    to: "0x" + BufferToHex(Buffer.from(to.address)),
+                    amount: assetAmount
+                },
+                {
+                    gasLimit: 1000000,
+                    value: value
+                }
+            );
+        } else {
+            gasAmount = ethers.BigNumber.from(assets.gas);
+
+            if (!gasAmount.gte(ONE.mul(3))) {
+                throw new Error("Gas must be equal or more then 3");
+            }
+
+            fromTx = await bridgeContract.connect(signer).submitUnwrappingRequest(
+                {
+                    assetId: gasId,
+                    from: await signer.getAddress(),
+                    to: "0x" + BufferToHex(Buffer.from(to.address)),
+                    amount: gasAmount.sub(ONE)
+                },
+                {
+                    gasLimit: 1000000,
+                    value: gasAmount
+                }
+            );
+        }
 
         const targetNetworkId = from.chain === ChainName.Milkomeda ? 1 : 0;
         return {
