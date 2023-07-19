@@ -205,13 +205,13 @@ function sortByMultiAsset(elems: TransactionUnspentOutput[], scriptHash: ScriptH
 export default class CoinSelection {
     private protocolParameters: any;
 
-    setProtocolParameters(minUTxO: string, minFeeA: string, minFeeB: string, maxTxSize: string, coinsPerUtxoWord: string) {
+    setProtocolParameters(minUTxO: string, minFeeA: string, minFeeB: string, maxTxSize: string, coinsPerUtxoByte: string) {
         this.protocolParameters = {
             minUTxO: minUTxO,
             minFeeA: minFeeA,
             minFeeB: minFeeB,
             maxTxSize: maxTxSize,
-            coinsPerUtxoWord: coinsPerUtxoWord
+            coinsPerUtxoByte: coinsPerUtxoByte
         };
         // console.log(this.protocolParameters);
     }
@@ -288,6 +288,10 @@ export default class CoinSelection {
         }
   
         await Loader.load();
+
+        const dataCost = Loader.CSL.DataCost.new_coins_per_byte(
+            Loader.CSL.BigNum.from_str(this.protocolParameters.coinsPerUtxoByte)
+        );
 
         let utxoSelection = {
             selection: [] as TransactionUnspentOutput[],
@@ -408,12 +412,22 @@ export default class CoinSelection {
         });
 
         do {
-            const amountRemaining = utxoSelection.amount.checked_sub(mergedOutputsAmounts);
+            let txOutputBuilder = Loader.CSL.TransactionOutputBuilder
+                .new()
+                .with_address(inputs[0].output().address());            
 
-            const minAda = Loader.CSL.min_ada_required(
-                amountRemaining,
-                Loader.CSL.BigNum.from_str(this.protocolParameters.coinsPerUtxoWord).checked_add(Loader.CSL.BigNum.from_str("1000000"))
+            let txOutputAmountBuilder = txOutputBuilder.next();
+
+            let amountRemaining = utxoSelection.amount.checked_sub(mergedOutputsAmounts);
+
+            let minAda = Loader.CSL.min_ada_for_output(
+                txOutputAmountBuilder
+                    .with_value(amountRemaining)
+                    .build(),
+                dataCost
             );
+
+            // console.log(amountRemaining.coin().to_str(), minAda.to_str());
 
             if (Loader.CSL.BigNum.from_str(amountRemaining.coin().to_str()).compare(minAda) < 0) {
                 if (utxoSelection.remaining.length === 0) {
@@ -436,9 +450,13 @@ export default class CoinSelection {
         // Phase 1: RandomSelect
         // Phase 2: Improve
 
+        // console.log((utxoSelection.amount).coin().to_str());
+        // console.log((utxoSelection.amount.checked_sub(mergedOutputsAmounts)).coin().to_str());
+
         return {
             input: utxoSelection.selection,
-            remaining: utxoSelection.remaining
+            remaining: utxoSelection.remaining,
+            reamainingValue: utxoSelection.amount.checked_sub(mergedOutputsAmounts)
         };
     }
 }

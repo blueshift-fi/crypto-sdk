@@ -351,7 +351,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
                     quantity: asset.quantity
                 }
             });
-            console.log("Ku", assets);
+            // console.log("Ku", assets);
             let multiAsset = CardanoWallet._makeMultiAsset(assets);
             val.set_multiasset(multiAsset);
         }
@@ -363,55 +363,81 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     
     /* TRANSACTION HANDLING */
+    
+    // private static _initTxBuilderV9(protocolParameters: any) {
+    //     const linearFee = Loader.CSL.LinearFee.new(
+    //         Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
+    //         Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString())
+    //     );
 
-    private static _initTxBuilderV9(protocolParameters: any) {
-        const txBuilder = Loader.CSL.TransactionBuilder.new(
-            // LinearFee (min_fee_a, min_fee_b)
-            Loader.CSL.LinearFee.new(
-                Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
-                Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString())
-            ),
-            // min_utxo
-            Loader.CSL.BigNum.from_str("1000000" /* protocolParameters.min_utxo.toString() */), // TODO: update for protocolParameters value
-            // pool_deposit
-            Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()),
-            // key_deposit
-            Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()),
-            // max_value_size
-            protocolParameters.max_val_size,
-            // max_tx_size
-            protocolParameters.max_tx_size,
-            protocolParameters.price_mem,
-            protocolParameters.price_step,
-            Loader.CSL.LanguageViews.new(HexToBuffer(LANGUAGE_VIEWS))
-        );
-        return txBuilder;
-    }
+    //     const txBuilder = Loader.CSL.TransactionBuilder.new(
+    //         // LinearFee (min_fee_a, min_fee_b)
+    //         linearFee,
+    //         // min_utxo
+    //         Loader.CSL.BigNum.from_str("1000000" /* protocolParameters.min_utxo.toString() */), // TODO: update for protocolParameters value
+    //         // pool_deposit
+    //         Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()),
+    //         // key_deposit
+    //         Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()),
+    //         // max_value_size
+    //         protocolParameters.max_val_size,
+    //         // max_tx_size
+    //         protocolParameters.max_tx_size,
+    //         protocolParameters.price_mem,
+    //         protocolParameters.price_step,
+    //         Loader.CSL.LanguageViews.new(HexToBuffer(LANGUAGE_VIEWS))
+    //     );
+    //     return txBuilder;
+    // }
 
     /*
     private static _initTxBuilderV10(protocolParameters: any) {
-        const txBuilder = Loader.CSL.TransactionBuilder.new(
-            Loader.CSL.TransactionBuilderConfigBuilder.new()
-                .fee_algo(
-                    Loader.CSL.LinearFee.new(
-                        Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
-                        Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString()))
-                )
-                .pool_deposit(Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()))
-                .key_deposit(Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()))
-                .coins_per_utxo_word(Loader.CSL.BigNum.from_str(protocolParameters.coins_per_utxo_word.toString()))
-                .max_value_size(protocolParameters.max_val_size)
-                .max_tx_size(protocolParameters.max_tx_size)
-                .prefer_pure_change(true)
-                .build()
+        const linearFee = Loader.CSL.LinearFee.new(
+            Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
+            Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString())
         );
+
+        const txBuilderCfg = Loader.CSL.TransactionBuilderConfigBuilder.new()
+            .fee_algo(linearFee)
+            .pool_deposit(Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()))
+            .key_deposit(Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()))
+            .coins_per_utxo_word(Loader.CSL.BigNum.from_str(protocolParameters.coins_per_utxo_word.toString()))
+            .max_value_size(protocolParameters.max_val_size)
+            .max_tx_size(protocolParameters.max_tx_size)
+            .prefer_pure_change(true)
+            .build()
+
+        const txBuilder = Loader.CSL.TransactionBuilder.new(txBuilderCfg);
+
         return txBuilder;
     }
     */
 
+    private static _initTxBuilderV11(protocolParameters: any) {
+        const linearFee = Loader.CSL.LinearFee.new(
+            Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
+            Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString())
+        );
+
+        const txBuilderCfg = Loader.CSL.TransactionBuilderConfigBuilder.new()
+            .fee_algo(linearFee)
+            .pool_deposit(Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()))
+            .key_deposit(Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()))
+            .coins_per_utxo_word(Loader.CSL.BigNum.from_str(protocolParameters.coins_per_utxo_word.toString()))
+            .max_value_size(protocolParameters.max_val_size)
+            .max_tx_size(protocolParameters.max_tx_size)
+            .prefer_pure_change(true)
+            .build()
+
+        const txBuilder = Loader.CSL.TransactionBuilder.new(txBuilderCfg);
+
+        return txBuilder;
+    }
+
     private static _initTxBuilder = (protocolParameters: any) =>
-        CardanoWallet._initTxBuilderV9(protocolParameters);
+        // CardanoWallet._initTxBuilderV9(protocolParameters);
         // CardanoWallet._initTxBuilderV10(protocolParameters);
+        CardanoWallet._initTxBuilderV11(protocolParameters);
     
     
     private static _makeMultiAsset(assets: CardanoAsset[]) {
@@ -481,6 +507,12 @@ class CardanoWallet implements Wallet, BridgeSupport {
             this.protocolParameters.coins_per_utxo_word.toString()
         );
 
+        const dataCost = Loader.CSL.DataCost.new_coins_per_byte(
+            Loader.CSL.BigNum.from_str(
+                this.protocolParameters.coins_per_utxo_word.toString()
+            )
+        );
+
         const datums = Loader.CSL.PlutusList.new();
         const redeemers = Loader.CSL.Redeemers.new();
         const plutusScripts = Loader.CSL.PlutusScripts.new();
@@ -490,29 +522,42 @@ class CardanoWallet implements Wallet, BridgeSupport {
         // Init outputs
         const outputs = Loader.CSL.TransactionOutputs.new();
 
+        // console.log(recipients);
+
         for (let recipient of recipients) {
-            let lovelace = recipient.amount ? recipient.amount : "1000000";
-            let outputValue = Loader.CSL.Value.new(Loader.CSL.BigNum.from_str(lovelace));
+            let txOutputBuilder = Loader.CSL.TransactionOutputBuilder
+                .new()
+                .with_address(Loader.CSL.Address.from_bech32(recipient.address));
+
+            let txOutputAmountBuilder = txOutputBuilder.next();
+
+
+            // build value
+
+            const lovelace = recipient.amount ? recipient.amount : "1000000";
+            const outputValue = Loader.CSL.Value.new(Loader.CSL.BigNum.from_str(lovelace));
 
             if ((recipient.assets && recipient.assets.length > 0)) {
-                // console.log(recipient.assets);
-                let multiAsset = CardanoWallet._makeMultiAsset(recipient.assets);
+                const multiAsset = CardanoWallet._makeMultiAsset(recipient.assets);
                 outputValue.set_multiasset(multiAsset);
-                let minAda = Loader.CSL.min_ada_required(
-                    outputValue,
-                    Loader.CSL.BigNum.from_str(this.protocolParameters.coins_per_utxo_word).checked_add(Loader.CSL.BigNum.from_str("1000000"))
+
+                const minAda = Loader.CSL.min_ada_for_output(
+                    txOutputAmountBuilder
+                        .with_value(outputValue)
+                        .build(),
+                    dataCost
                 );
                 if (Loader.CSL.BigNum.from_str(lovelace).compare(minAda) < 0) {
                     outputValue.set_coin(minAda);
                 }
             }
 
+            // add output
             if (parseInt(outputValue.coin().to_str()) > 0) {
                 outputs.add(
-                    Loader.CSL.TransactionOutput.new(
-                        Loader.CSL.Address.from_bech32(recipient.address),
-                        outputValue
-                    )
+                    txOutputAmountBuilder
+                        .with_value(outputValue)
+                        .build()
                 );
             }
         }
@@ -534,6 +579,41 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 UTXO_LIMIT,
                 SelectionMode.BIGGER_FIRST
             );
+
+            if (selection.reamainingValue.multiasset() !== undefined) {
+                let txOutputBuilder = Loader.CSL.TransactionOutputBuilder
+                    .new()
+                    .with_address(Loader.CSL.Address.from_bech32(payer.address));
+
+                let txOutputAmountBuilder = txOutputBuilder.next();
+
+
+                // build value
+                const lovelace = Loader.CSL.BigNum.from_str("1000000");
+                const outputValue = selection.reamainingValue;
+                outputValue.set_coin(lovelace);
+
+                const minAda = Loader.CSL.min_ada_for_output(
+                    txOutputAmountBuilder
+                        .with_value(outputValue)
+                        .build(),
+                    dataCost
+                );
+
+                if (lovelace.compare(minAda) < 0) {
+                    outputValue.set_coin(minAda);
+                }
+
+                // add output
+
+                // if (parseInt(outputValue.coin().to_str()) > 0) {
+                    outputs.add(
+                        txOutputAmountBuilder
+                            .with_value(outputValue)
+                            .build()
+                    );
+                // }
+            }
         } catch (err) {
             switch(err.message) {
             case "BALANCE_EXHAUSTED":
