@@ -905,10 +905,10 @@ class CardanoWallet implements Wallet, BridgeSupport {
     async bridgeExtra(
         assets: {
             gas: string,
-            tokens?: Asset[],
+            token?: Asset,
         } | {
             gas?: string,
-            tokens: Asset[],
+            token: Asset,
         },
         to: {
             address: string,
@@ -926,11 +926,6 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         const usedAddress = (await this.getUsedAddresses())[0];
 
-        const asset: Asset = assets?.tokens ? assets.tokens[0] : {
-            token: "lovelace",
-            quantity: assets.gas
-        } as Asset;
-
         // const balance = (await this.getBalance()).filter(b => b.unit === asset.token)[0];
 
         const payer = {
@@ -942,11 +937,11 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 networkId
                 ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].address
                 : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].address,
-            amount: asset.token == "lovelace" ? asset.quantity : undefined,
-            assets: asset.token != "lovelace" ? [{
-                unit: asset.token,
-                quantity: asset.quantity
-            }] : undefined
+            amount: assets.gas ? assets.gas : undefined,
+            assets: assets.token ? [{
+                unit: assets.token.token,
+                quantity: assets.token.quantity
+            } as CardanoAsset] : undefined
         }];
         const metadata =
             networkId

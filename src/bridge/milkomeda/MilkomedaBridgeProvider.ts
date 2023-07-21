@@ -261,11 +261,11 @@ class MilkomedaBridgeProvider implements BridgeProvider {
                     assetId: gasId,
                     from: await signer.getAddress(),
                     to: "0x" + BufferToHex(Buffer.from(to.address)),
-                    amount: gasAmount.sub(ONE)
+                    amount: gasAmount
                 },
                 {
                     gasLimit: 1000000,
-                    value: gasAmount
+                    value: gasAmount.add(ONE)
                 }
             );
         }

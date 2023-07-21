@@ -21,10 +21,10 @@ export interface BridgeSupport {
     bridgeExtra(
         assets: {
             gas: string,
-            tokens?: Asset[],
+            token?: Asset,
         } | {
             gas?: string,
-            tokens: Asset[],
+            token: Asset,
         },
         to: {
             address: string,
