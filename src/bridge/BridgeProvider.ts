@@ -9,7 +9,15 @@ interface BridgeProvider {
     // get name(): BridgeName;
     getBridgeTxFor(txId: string, networkId: number): Promise<string>;
 
-    // Temporary method
+    // Temporary methods
+
+    approveForBridge(
+        asset: Asset,
+        from: { chain: string, address: string },
+        to: { chain: string, address: string },
+        signer: Signer
+    ): Promise<any>;
+
     bridgeFromEVM(
         asset: Asset,
         from: { chain: string, address: string },

@@ -204,6 +204,23 @@ class CardanoWallet implements Wallet, BridgeSupport {
         return addresses;
     }
 
+    async getRewardAddress() {
+        if (!await this.isEnabled()) {
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
+        }
+
+        console.log(await this.walletApi.getRewardAddresses());
+
+        const cborAddress = (await this.walletApi.getRewardAddresses())[0];
+        const address = Loader.CSL.RewardAddress.from_address(
+            Loader.CSL.Address.from_bytes(
+                HexToBuffer(cborAddress)
+            )
+        )?.to_address().to_bech32();
+
+        return address;
+    }
+
     async getChangeAddress() {
         if (!await this.isEnabled()) {
             throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
@@ -217,6 +234,10 @@ class CardanoWallet implements Wallet, BridgeSupport {
         )?.to_address().to_bech32();
 
         return address;
+    }
+
+    async getAddress() {
+        return this.getChangeAddress();
     }
 
     async signData(addr: string, payload: string): Promise<{ key: string; signature: string }> {

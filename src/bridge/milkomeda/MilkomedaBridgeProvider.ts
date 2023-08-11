@@ -100,6 +100,32 @@ class MilkomedaBridgeProvider implements BridgeProvider {
 
         throw ERROR();
     }
+    
+    async approveForBridge(
+        asset: Asset,
+        from: { chain: string, address: string },
+        to: { chain: string, address: string },
+        signer: Signer
+    ): Promise<any> {
+        const bridgeConfig = bridgeConfigs[BridgeName.Milkomeda][from.chain][to.chain];
+
+        if (!bridgeConfig) {
+            throw new Error("Bridge config is undefiend");
+        }
+
+        const amount = ethers.BigNumber.from(asset.quantity);
+
+        if (asset.token !== ETH_ADDRESS) {
+            const tokenContract = new ethers.Contract(asset.token, IERC20Abi, signer);
+            const allowanceAmount: ethers.BigNumber = await tokenContract.allowance(await signer.getAddress(), bridgeConfig.address);
+
+            if (amount.gt(allowanceAmount)) {
+                return await tokenContract.connect(signer).approve(bridgeConfig.address, amount, { gasLimit: 1000000 });
+            }
+        }
+
+        return undefined;
+    }
 
     async bridgeFromEVM(
         asset: Asset,
