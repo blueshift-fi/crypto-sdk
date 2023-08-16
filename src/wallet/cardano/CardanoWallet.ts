@@ -850,8 +850,8 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 networkId
                 ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].address
                 : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].address,
-            amount: asset.token == "lovelace" ? asset.quantity : undefined,
-            assets: asset.token != "lovelace" ? [{
+            amount: asset.token == "lovelace" && !Loader.CSL.BigNum.from_str(asset.quantity).is_zero() ? asset.quantity : undefined,
+            assets: asset.token != "lovelace" && !Loader.CSL.BigNum.from_str(asset.quantity).is_zero() ? [{
                 unit: asset.token,
                 quantity: asset.quantity
             }] : undefined
@@ -958,8 +958,8 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 networkId
                 ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].address
                 : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].address,
-            amount: assets.gas ? assets.gas : undefined,
-            assets: assets.token ? [{
+            amount: assets.gas && !Loader.CSL.BigNum.from_str(assets.gas).is_zero() ? assets.gas : undefined,
+            assets: assets.token && !Loader.CSL.BigNum.from_str(assets.token.quantity).is_zero() ? [{
                 unit: assets.token.token,
                 quantity: assets.token.quantity
             } as CardanoAsset] : undefined
