@@ -303,21 +303,24 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async _getCborUtxos(): Promise<string[]> {
-        if (this.walletName === CardanoWalletName.NUFI) {
-            const utxos = await (this.blockchainProvider as Blockfrost).getAddressUtxos(
-                (await this.getUsedAddresses())[0],
-                await this.getNetworkId()
-            );
+        switch (this.walletName) {
+            case CardanoWalletName.NUFI:
+            case CardanoWalletName.FLINT:
+                const utxos = await (this.blockchainProvider as Blockfrost).getAddressUtxos(
+                    (await this.getUsedAddresses())[0],
+                    await this.getNetworkId()
+                );
+    
+                return utxos.map(utxo => this.toCborUtxo(utxo));
 
-            return utxos.map(utxo => this.toCborUtxo(utxo));
+            default:
+                return await this.walletApi.getUtxos();
         }
-
-        return await this.walletApi.getUtxos();
     }
 
     async getUtxos() {
         const hexUtxos = await this._getCborUtxos();
-        // console.log();
+
         const Utxos = hexUtxos.map(
             utxo => Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxo))
         );
