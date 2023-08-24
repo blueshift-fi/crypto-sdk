@@ -596,47 +596,67 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         let selection;
         try {
-            selection = await coinSelection.select(
-                payerUtxos,
-                outputs,
-                fee,
-                UTXO_LIMIT,
-                SelectionMode.BIGGER_FIRST
-            );
+            let newFee = fee;
 
-            if (selection.reamainingValue.multiasset() !== undefined) {
-                let txOutputBuilder = Loader.CSL.TransactionOutputBuilder
-                    .new()
-                    .with_address(Loader.CSL.Address.from_bech32(payer.address));
-
-                let txOutputAmountBuilder = txOutputBuilder.next();
-
-
-                // build value
-                const lovelace = Loader.CSL.BigNum.from_str("1000000");
-                const outputValue = selection.reamainingValue;
-                outputValue.set_coin(lovelace);
-
-                const minAda = Loader.CSL.min_ada_for_output(
-                    txOutputAmountBuilder
-                        .with_value(outputValue)
-                        .build(),
-                    dataCost
+            while (true) {
+                selection = await coinSelection.select(
+                    payerUtxos,
+                    outputs,
+                    newFee,
+                    UTXO_LIMIT,
+                    SelectionMode.BIGGER_FIRST
                 );
 
-                if (lovelace.compare(minAda) < 0) {
-                    outputValue.set_coin(minAda);
-                }
+                let reamainingLovelace = selection.reamainingValue.coin();
 
-                // add output
+                const alwaysNeedLovelace = Loader.CSL.BigNum.from("1000000").checked_add(Loader.CSL.BigNum.from(fee ? fee : "300000"));
+                let needLovelace = alwaysNeedLovelace;
 
-                // if (parseInt(outputValue.coin().to_str()) > 0) {
-                    outputs.add(
+                if (selection.reamainingValue.multiasset() !== undefined) {
+                    let txOutputBuilder = Loader.CSL.TransactionOutputBuilder
+                        .new()
+                        .with_address(Loader.CSL.Address.from_bech32(payer.address));
+
+                    let txOutputAmountBuilder = txOutputBuilder.next();
+
+
+                    // build value
+                    const lovelace = Loader.CSL.BigNum.from_str("1000000");
+                    const outputValue = selection.reamainingValue;
+                    outputValue.set_coin(lovelace);
+
+                    const minAda = Loader.CSL.min_ada_for_output(
                         txOutputAmountBuilder
                             .with_value(outputValue)
-                            .build()
+                            .build(),
+                        dataCost
                     );
-                // }
+
+                    if (lovelace.compare(minAda) < 0) {
+                        outputValue.set_coin(minAda);
+                    }
+
+                    // add output
+
+                    // if (parseInt(outputValue.coin().to_str()) > 0) {
+                        outputs.add(
+                            txOutputAmountBuilder
+                                .with_value(outputValue)
+                                .build()
+                        );
+                    // }
+
+
+                    needLovelace = needLovelace.checked_add(outputValue.coin());
+                    reamainingLovelace = reamainingLovelace.checked_sub(outputValue.coin());
+                }
+
+                if (reamainingLovelace.compare(alwaysNeedLovelace) < 0) {
+                    newFee = needLovelace.to_str();
+                    continue;
+                }
+
+                break;
             }
         } catch (err) {
             switch(err.message) {
