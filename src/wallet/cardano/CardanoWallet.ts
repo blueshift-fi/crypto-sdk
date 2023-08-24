@@ -607,7 +607,10 @@ class CardanoWallet implements Wallet, BridgeSupport {
                     SelectionMode.BIGGER_FIRST
                 );
 
-                let reamainingLovelace = selection.reamainingValue.coin();
+                // console.log(selection.input);
+                // console.log(selection.reamainingValue.coin().to_str());
+
+                let remainingLovelace = selection.reamainingValue.coin();
 
                 const alwaysNeedLovelace = Loader.CSL.BigNum.from_str("1000000").checked_add(Loader.CSL.BigNum.from_str(fee ? fee : "300000"));
                 let needLovelace = alwaysNeedLovelace;
@@ -636,6 +639,14 @@ class CardanoWallet implements Wallet, BridgeSupport {
                         outputValue.set_coin(minAda);
                     }
 
+                    needLovelace = needLovelace.checked_add(outputValue.coin());
+                    remainingLovelace = remainingLovelace.checked_sub(outputValue.coin());
+
+                    if (remainingLovelace.compare(alwaysNeedLovelace) < 0) {
+                        newFee = needLovelace.to_str();
+                        continue;
+                    }
+
                     // add output
 
                     // if (parseInt(outputValue.coin().to_str()) > 0) {
@@ -645,13 +656,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
                                 .build()
                         );
                     // }
-
-
-                    needLovelace = needLovelace.checked_add(outputValue.coin());
-                    reamainingLovelace = reamainingLovelace.checked_sub(outputValue.coin());
-                }
-
-                if (reamainingLovelace.compare(alwaysNeedLovelace) < 0) {
+                } else if (remainingLovelace.compare(alwaysNeedLovelace) < 0) {
                     newFee = needLovelace.to_str();
                     continue;
                 }

@@ -456,7 +456,7 @@ export default class CoinSelection {
         return {
             input: utxoSelection.selection,
             remaining: utxoSelection.remaining,
-            reamainingValue: utxoSelection.amount.checked_sub(mergedOutputsAmounts)
+            reamainingValue: utxoSelection.amount.checked_add(maxFee).checked_sub(mergedOutputsAmounts)
         };
     }
 }
