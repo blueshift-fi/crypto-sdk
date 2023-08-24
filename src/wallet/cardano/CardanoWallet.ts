@@ -609,7 +609,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
                 let reamainingLovelace = selection.reamainingValue.coin();
 
-                const alwaysNeedLovelace = Loader.CSL.BigNum.from("1000000").checked_add(Loader.CSL.BigNum.from(fee ? fee : "300000"));
+                const alwaysNeedLovelace = Loader.CSL.BigNum.from_str("1000000").checked_add(Loader.CSL.BigNum.from_str(fee ? fee : "300000"));
                 let needLovelace = alwaysNeedLovelace;
 
                 if (selection.reamainingValue.multiasset() !== undefined) {
