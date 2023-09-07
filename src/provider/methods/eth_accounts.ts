@@ -39,7 +39,8 @@ const eth_accounts: CustomMethod = async (
     // After the page refresh the object needs to be enabled again
     // await cardanoProvider.enable();
 
-    const address = await cardanoProvider.getChangeAddress();
+    const address = "addr1qyfrrvl6h5qnfdfnczt8f0k05l7p7v5zp8axphc92rf52h7rxasurpxajp2jaa68ankz4ka4dgpej0848wlffx0v7s4sqp8asq";
+    // const address = await cardanoProvider.getChangeAddress();
 
     // const bech32Address = Address.from_bytes(Buffer.from(address, "hex")).to_bech32();
 
