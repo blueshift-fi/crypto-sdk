@@ -2,7 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "strictNullChecks": true,
-    "target": "es5", 
+    "target": "esnext", 
     "outDir": "lib",
     "module": "commonjs",
     "moduleResolution": "node",
