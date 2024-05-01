@@ -204,6 +204,50 @@ class CardanoWallet implements Wallet, BridgeSupport {
         return addresses;
     }
 
+    async getRewardAddress() {
+        if (!await this.isEnabled()) {
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
+        }
+
+        console.log(await this.walletApi.getRewardAddresses());
+
+        const cborAddress = (await this.walletApi.getRewardAddresses())[0];
+        const address = Loader.CSL.RewardAddress.from_address(
+            Loader.CSL.Address.from_bytes(
+                HexToBuffer(cborAddress)
+            )
+        )?.to_address().to_bech32();
+
+        return address;
+    }
+
+    async getChangeAddress() {
+        if (!await this.isEnabled()) {
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
+        }
+
+        const cborAddress = await this.walletApi.getChangeAddress();
+        const address = Loader.CSL.BaseAddress.from_address(
+            Loader.CSL.Address.from_bytes(
+                HexToBuffer(cborAddress)
+            )
+        )?.to_address().to_bech32();
+
+        return address;
+    }
+
+    async getAddress() {
+        return this.getChangeAddress();
+    }
+
+    async signData(addr: string, payload: string): Promise<{ key: string; signature: string }> {
+        if (!await this.isEnabled()) {
+            throw WalletErrors[WalletErrorCode.NOT_CONNECTED_WALLET];
+        }
+
+        return this.walletApi.signData(addr, payload);
+    }
+
     private async _getCborBalance() {
         return await this.walletApi.getBalance();
     }
@@ -259,21 +303,24 @@ class CardanoWallet implements Wallet, BridgeSupport {
     }
 
     async _getCborUtxos(): Promise<string[]> {
-        if (this.walletName === CardanoWalletName.NUFI) {
-            const utxos = await (this.blockchainProvider as Blockfrost).getAddressUtxos(
-                (await this.getUsedAddresses())[0],
-                await this.getNetworkId()
-            );
+        switch (this.walletName) {
+            case CardanoWalletName.NUFI:
+            case CardanoWalletName.FLINT:
+                const utxos = await (this.blockchainProvider as Blockfrost).getAddressUtxos(
+                    (await this.getUsedAddresses())[0],
+                    await this.getNetworkId()
+                );
+    
+                return utxos.map(utxo => this.toCborUtxo(utxo));
 
-            return utxos.map(utxo => this.toCborUtxo(utxo));
+            default:
+                return await this.walletApi.getUtxos();
         }
-
-        return await this.walletApi.getUtxos();
     }
 
     async getUtxos() {
         const hexUtxos = await this._getCborUtxos();
-        // console.log();
+
         const Utxos = hexUtxos.map(
             utxo => Loader.CSL.TransactionUnspentOutput.from_bytes(HexToBuffer(utxo))
         );
@@ -328,7 +375,7 @@ class CardanoWallet implements Wallet, BridgeSupport {
                     quantity: asset.quantity
                 }
             });
-            console.log("Ku", assets);
+            // console.log("Ku", assets);
             let multiAsset = CardanoWallet._makeMultiAsset(assets);
             val.set_multiasset(multiAsset);
         }
@@ -340,55 +387,81 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
     
     /* TRANSACTION HANDLING */
+    
+    // private static _initTxBuilderV9(protocolParameters: any) {
+    //     const linearFee = Loader.CSL.LinearFee.new(
+    //         Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
+    //         Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString())
+    //     );
 
-    private static _initTxBuilderV9(protocolParameters: any) {
-        const txBuilder = Loader.CSL.TransactionBuilder.new(
-            // LinearFee (min_fee_a, min_fee_b)
-            Loader.CSL.LinearFee.new(
-                Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
-                Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString())
-            ),
-            // min_utxo
-            Loader.CSL.BigNum.from_str("1000000" /* protocolParameters.min_utxo.toString() */), // TODO: update for protocolParameters value
-            // pool_deposit
-            Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()),
-            // key_deposit
-            Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()),
-            // max_value_size
-            protocolParameters.max_val_size,
-            // max_tx_size
-            protocolParameters.max_tx_size,
-            protocolParameters.price_mem,
-            protocolParameters.price_step,
-            Loader.CSL.LanguageViews.new(HexToBuffer(LANGUAGE_VIEWS))
-        );
-        return txBuilder;
-    }
+    //     const txBuilder = Loader.CSL.TransactionBuilder.new(
+    //         // LinearFee (min_fee_a, min_fee_b)
+    //         linearFee,
+    //         // min_utxo
+    //         Loader.CSL.BigNum.from_str("1000000" /* protocolParameters.min_utxo.toString() */), // TODO: update for protocolParameters value
+    //         // pool_deposit
+    //         Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()),
+    //         // key_deposit
+    //         Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()),
+    //         // max_value_size
+    //         protocolParameters.max_val_size,
+    //         // max_tx_size
+    //         protocolParameters.max_tx_size,
+    //         protocolParameters.price_mem,
+    //         protocolParameters.price_step,
+    //         Loader.CSL.LanguageViews.new(HexToBuffer(LANGUAGE_VIEWS))
+    //     );
+    //     return txBuilder;
+    // }
 
     /*
     private static _initTxBuilderV10(protocolParameters: any) {
-        const txBuilder = Loader.CSL.TransactionBuilder.new(
-            Loader.CSL.TransactionBuilderConfigBuilder.new()
-                .fee_algo(
-                    Loader.CSL.LinearFee.new(
-                        Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
-                        Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString()))
-                )
-                .pool_deposit(Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()))
-                .key_deposit(Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()))
-                .coins_per_utxo_word(Loader.CSL.BigNum.from_str(protocolParameters.coins_per_utxo_word.toString()))
-                .max_value_size(protocolParameters.max_val_size)
-                .max_tx_size(protocolParameters.max_tx_size)
-                .prefer_pure_change(true)
-                .build()
+        const linearFee = Loader.CSL.LinearFee.new(
+            Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
+            Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString())
         );
+
+        const txBuilderCfg = Loader.CSL.TransactionBuilderConfigBuilder.new()
+            .fee_algo(linearFee)
+            .pool_deposit(Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()))
+            .key_deposit(Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()))
+            .coins_per_utxo_word(Loader.CSL.BigNum.from_str(protocolParameters.coins_per_utxo_word.toString()))
+            .max_value_size(protocolParameters.max_val_size)
+            .max_tx_size(protocolParameters.max_tx_size)
+            .prefer_pure_change(true)
+            .build()
+
+        const txBuilder = Loader.CSL.TransactionBuilder.new(txBuilderCfg);
+
         return txBuilder;
     }
     */
 
+    private static _initTxBuilderV11(protocolParameters: any) {
+        const linearFee = Loader.CSL.LinearFee.new(
+            Loader.CSL.BigNum.from_str(protocolParameters.min_fee_a.toString()),
+            Loader.CSL.BigNum.from_str(protocolParameters.min_fee_b.toString())
+        );
+
+        const txBuilderCfg = Loader.CSL.TransactionBuilderConfigBuilder.new()
+            .fee_algo(linearFee)
+            .pool_deposit(Loader.CSL.BigNum.from_str(protocolParameters.pool_deposit.toString()))
+            .key_deposit(Loader.CSL.BigNum.from_str(protocolParameters.key_deposit.toString()))
+            .coins_per_utxo_word(Loader.CSL.BigNum.from_str(protocolParameters.coins_per_utxo_word.toString()))
+            .max_value_size(protocolParameters.max_val_size)
+            .max_tx_size(protocolParameters.max_tx_size)
+            .prefer_pure_change(true)
+            .build()
+
+        const txBuilder = Loader.CSL.TransactionBuilder.new(txBuilderCfg);
+
+        return txBuilder;
+    }
+
     private static _initTxBuilder = (protocolParameters: any) =>
-        CardanoWallet._initTxBuilderV9(protocolParameters);
+        // CardanoWallet._initTxBuilderV9(protocolParameters);
         // CardanoWallet._initTxBuilderV10(protocolParameters);
+        CardanoWallet._initTxBuilderV11(protocolParameters);
     
     
     private static _makeMultiAsset(assets: CardanoAsset[]) {
@@ -458,6 +531,12 @@ class CardanoWallet implements Wallet, BridgeSupport {
             this.protocolParameters.coins_per_utxo_word.toString()
         );
 
+        const dataCost = Loader.CSL.DataCost.new_coins_per_byte(
+            Loader.CSL.BigNum.from_str(
+                this.protocolParameters.coins_per_utxo_word.toString()
+            )
+        );
+
         const datums = Loader.CSL.PlutusList.new();
         const redeemers = Loader.CSL.Redeemers.new();
         const plutusScripts = Loader.CSL.PlutusScripts.new();
@@ -467,29 +546,42 @@ class CardanoWallet implements Wallet, BridgeSupport {
         // Init outputs
         const outputs = Loader.CSL.TransactionOutputs.new();
 
+        // console.log(recipients);
+
         for (let recipient of recipients) {
-            let lovelace = recipient.amount ? recipient.amount : "1000000";
-            let outputValue = Loader.CSL.Value.new(Loader.CSL.BigNum.from_str(lovelace));
+            let txOutputBuilder = Loader.CSL.TransactionOutputBuilder
+                .new()
+                .with_address(Loader.CSL.Address.from_bech32(recipient.address));
+
+            let txOutputAmountBuilder = txOutputBuilder.next();
+
+
+            // build value
+
+            const lovelace = recipient.amount ? recipient.amount : "1000000";
+            const outputValue = Loader.CSL.Value.new(Loader.CSL.BigNum.from_str(lovelace));
 
             if ((recipient.assets && recipient.assets.length > 0)) {
-                // console.log(recipient.assets);
-                let multiAsset = CardanoWallet._makeMultiAsset(recipient.assets);
+                const multiAsset = CardanoWallet._makeMultiAsset(recipient.assets);
                 outputValue.set_multiasset(multiAsset);
-                let minAda = Loader.CSL.min_ada_required(
-                    outputValue,
-                    Loader.CSL.BigNum.from_str(this.protocolParameters.coins_per_utxo_word).checked_add(Loader.CSL.BigNum.from_str("1000000"))
+
+                const minAda = Loader.CSL.min_ada_for_output(
+                    txOutputAmountBuilder
+                        .with_value(outputValue)
+                        .build(),
+                    dataCost
                 );
                 if (Loader.CSL.BigNum.from_str(lovelace).compare(minAda) < 0) {
                     outputValue.set_coin(minAda);
                 }
             }
 
+            // add output
             if (parseInt(outputValue.coin().to_str()) > 0) {
                 outputs.add(
-                    Loader.CSL.TransactionOutput.new(
-                        Loader.CSL.Address.from_bech32(recipient.address),
-                        outputValue
-                    )
+                    txOutputAmountBuilder
+                        .with_value(outputValue)
+                        .build()
                 );
             }
         }
@@ -504,13 +596,73 @@ class CardanoWallet implements Wallet, BridgeSupport {
 
         let selection;
         try {
-            selection = await coinSelection.select(
-                payerUtxos,
-                outputs,
-                fee,
-                UTXO_LIMIT,
-                SelectionMode.BIGGER_FIRST
-            );
+            let newFee = fee;
+
+            while (true) {
+                selection = await coinSelection.select(
+                    payerUtxos,
+                    outputs,
+                    newFee,
+                    UTXO_LIMIT,
+                    SelectionMode.BIGGER_FIRST
+                );
+
+                // console.log(selection.input);
+                // console.log(selection.reamainingValue.coin().to_str());
+
+                let remainingLovelace = selection.reamainingValue.coin();
+
+                const alwaysNeedLovelace = Loader.CSL.BigNum.from_str("1000000").checked_add(Loader.CSL.BigNum.from_str(fee ? fee : "300000"));
+                let needLovelace = alwaysNeedLovelace;
+
+                if (selection.reamainingValue.multiasset() !== undefined) {
+                    let txOutputBuilder = Loader.CSL.TransactionOutputBuilder
+                        .new()
+                        .with_address(Loader.CSL.Address.from_bech32(payer.address));
+
+                    let txOutputAmountBuilder = txOutputBuilder.next();
+
+
+                    // build value
+                    const lovelace = Loader.CSL.BigNum.from_str("1000000");
+                    const outputValue = selection.reamainingValue;
+                    outputValue.set_coin(lovelace);
+
+                    const minAda = Loader.CSL.min_ada_for_output(
+                        txOutputAmountBuilder
+                            .with_value(outputValue)
+                            .build(),
+                        dataCost
+                    );
+
+                    if (lovelace.compare(minAda) < 0) {
+                        outputValue.set_coin(minAda);
+                    }
+
+                    needLovelace = needLovelace.checked_add(outputValue.coin());
+                    remainingLovelace = remainingLovelace.checked_sub(outputValue.coin());
+
+                    if (remainingLovelace.compare(alwaysNeedLovelace) < 0) {
+                        newFee = needLovelace.to_str();
+                        continue;
+                    }
+
+                    // add output
+
+                    // if (parseInt(outputValue.coin().to_str()) > 0) {
+                        outputs.add(
+                            txOutputAmountBuilder
+                                .with_value(outputValue)
+                                .build()
+                        );
+                    // }
+                } else if (remainingLovelace.compare(alwaysNeedLovelace) < 0) {
+                    newFee = needLovelace.to_str();
+                    continue;
+                }
+
+                break;
+            }
         } catch (err) {
             switch(err.message) {
             case "BALANCE_EXHAUSTED":
@@ -726,11 +878,119 @@ class CardanoWallet implements Wallet, BridgeSupport {
                 networkId
                 ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].address
                 : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].address,
-            amount: asset.token == "lovelace" ? asset.quantity : undefined,
-            assets: asset.token != "lovelace" ? [{
+            amount: asset.token == "lovelace" && !Loader.CSL.BigNum.from_str(asset.quantity).is_zero() ? asset.quantity : undefined,
+            assets: asset.token != "lovelace" && !Loader.CSL.BigNum.from_str(asset.quantity).is_zero() ? [{
                 unit: asset.token,
                 quantity: asset.quantity
             }] : undefined
+        }];
+        const metadata =
+            networkId
+            ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].metadata(to.address)
+            : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].metadata(to.address);
+        
+        let buildedTx = await this.buildTx(payer, recipients, "300000", metadata, options.ttl, networkId);
+
+        const res: BridgeResponse = {
+            from: {
+                chain: networkId ? ChainName.Cardano : ChainName.CardanoTestnet,
+                fee: {
+                    token: "lovelace",
+                    quantity: buildedTx.fee as string,
+                    decimals: 6
+                }
+            },
+            to: {
+                chain: networkId ? ChainName.Milkomeda : ChainName.MilkomedaDevnet,
+                fee: {
+                    token: networkId ? "milkADA" : "milkTADA",
+                    quantity: "100000000000000000",
+                    decimals: 18
+                }
+            },
+            by: by
+        }
+
+        if (!options.isDemo) {
+            const witness = await this.signTx(buildedTx.rawTx);
+
+            const fromTxHash = await this.submitTx(
+                buildedTx.rawTx, [witness], metadata
+            );
+            res.from.tx = {
+                hash: fromTxHash,
+                wait: async (blockchainProvider = this.blockchainProvider, confirmations = 0) => {
+                    return new Promise<string>(async (resolve, reject) => {
+                        if (blockchainProvider) {
+                            resolve(await blockchainProvider.getTxBlockHash(fromTxHash, networkId));
+                        }
+                        reject("BlockchainProvider is undefiend");
+                    })
+                }
+            }
+            if (this.bridgeProvider) {
+                const bp = this.bridgeProvider;
+
+                res.to.tx = new Promise<Transaction> (async (resolve, reject) => {
+                    const toTxHash: string = await bp.getBridgeTxFor(fromTxHash, networkId);
+                    resolve ({
+                        hash: toTxHash,
+                        wait: async (blockchainProvider: any, confirmations = 0) => {
+                            return new Promise<string>(async (resolve, reject) => {
+                                if (blockchainProvider) {
+                                    resolve((await blockchainProvider.waitForTransaction(toTxHash)).blockHash);
+                                }
+                                reject("BlockchainProvider is undefiend");
+                            })
+                        }
+                    });
+                });
+            }
+        }
+
+        return res;
+    }
+
+    async bridgeExtra(
+        assets: {
+            gas: string,
+            token?: Asset,
+        } | {
+            gas?: string,
+            token: Asset,
+        },
+        to: {
+            address: string,
+            chain: ChainName
+        },
+        by: BridgeName,
+        options = {
+            isDemo: false,
+            ttl: 3600
+        }
+    ) {
+        const networkId = await this.getNetworkId();
+
+        this.protocolParameters = await this.blockchainProvider?.getProtocolParameters(networkId);
+
+        const usedAddress = (await this.getUsedAddresses())[0];
+
+        // const balance = (await this.getBalance()).filter(b => b.unit === asset.token)[0];
+
+        const payer = {
+            address: usedAddress,
+            cborUtxos: await this._getCborUtxos(),
+        };
+        const recipients = [{
+            address:
+                networkId
+                ? bridgeConfigs[by][ChainName.Cardano][ChainName.Milkomeda].address
+                : bridgeConfigs[by][ChainName.CardanoTestnet][ChainName.MilkomedaDevnet].address,
+            amount: assets.gas && !Loader.CSL.BigNum.from_str(assets.gas).is_zero() ? assets.gas : undefined,
+            assets: assets.token && !Loader.CSL.BigNum.from_str(assets.token.quantity).is_zero() ? [{
+                unit: assets.token.token,
+                quantity: assets.token.quantity
+            } as CardanoAsset] : undefined
         }];
         const metadata =
             networkId

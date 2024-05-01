@@ -17,4 +17,23 @@ export interface BridgeSupport {
             ttl: number
         }
     ): Promise<BridgeResponse>;
+
+    bridgeExtra(
+        assets: {
+            gas: string,
+            token?: Asset,
+        } | {
+            gas?: string,
+            token: Asset,
+        },
+        to: {
+            address: string,
+            chain: ChainName
+        },
+        by: BridgeName,
+        options: {
+            isDemo: boolean,
+            ttl: number
+        }
+    ): Promise<BridgeResponse>;
 }

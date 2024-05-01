@@ -26,6 +26,8 @@ interface Wallet {
 
     /* ACCOUNT INFO */
 
+    getAddress(): Promise<string>
+
     getUsedAddresses(): Promise<string[]>
 
     getBalance(): Promise<any>;
