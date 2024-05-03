@@ -1,6 +1,6 @@
 {
   "name": "crypto-sdk",
-  "version": "0.5.16",
+  "version": "0.5.20-reverse",
   "description": "SDK for working with different blockchains",
   "license": "GPLv3",
   "main": "lib/index.js",
@@ -31,7 +31,7 @@
     "zod": "^3.20.2"
   },
   "devDependencies": {
-    "@types/node": "^18.0.1",
+    "@types/node": "^16.18.96",
     "@typescript-eslint/eslint-plugin": "^5.30.5",
     "@typescript-eslint/parser": "^5.30.5",
     "eslint": "^8.19.0"
