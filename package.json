@@ -1,13 +1,12 @@
 {
   "name": "crypto-sdk",
-  "version": "0.5.19",
+  "version": "0.5.24",
   "description": "SDK for working with different blockchains",
   "license": "GPLv3",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "files": [
-    "lib",
-    "custom_modules"
+    "lib"
   ],
   "scripts": {
     "build": "tsc",
@@ -25,19 +24,15 @@
   ],
   "dependencies": {
     "@dcspark/cardano-multiplatform-lib-browser": "^3.1.1",
-    "@emurgo/cardano-serialization-lib-browser": "^11.4.0",
+    "@emurgo/cardano-serialization-lib-browser": "^9.1.4",
     "buffer": "^6.0.3",
-    "ethers": "^5.7.2",
-    "zod": "^3.23.5"
+    "ethers": "^5.6.9"
   },
   "devDependencies": {
-    "@emurgo/cardano-serialization-lib-browser": "^9.1.4",
-    "@types/node": "^18.19.31",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "@typescript-eslint/parser": "^5.62.0",
-    "buffer": "^6.0.3",
-    "eslint": "^8.57.0",
-    "ethers": "^5.7.2",
-    "zod": "^3.23.5"
+    "@types/node": "^16.18.96",
+    "@typescript-eslint/eslint-plugin": "^5.30.5",
+    "@typescript-eslint/parser": "^5.30.5",
+    "eslint": "^8.19.0",
+    "zod": "3.20.2"
   }
 }
