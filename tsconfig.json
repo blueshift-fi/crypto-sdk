@@ -2,14 +2,13 @@
   "compilerOptions": {
     "declaration": true,
     "strictNullChecks": true,
-    "target": "esnext", 
+    "target": "es5",
     "outDir": "lib",
     "module": "commonjs",
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "lib": [
       "es2015",
-      "es2020",
       "dom"
     ],
     "baseUrl": ".",
